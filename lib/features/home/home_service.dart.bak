@@ -1,0 +1,137 @@
+import '../../core/auth/auth_service.dart';
+import '../../services/paciente_api_service.dart';
+
+/// Serviço responsável por carregar e normalizar os dados
+/// necessários para a Home do paciente.
+///
+/// As regras de comunicação permanecem no
+/// PacienteApiService.
+///
+/// A HomeService apenas:
+///
+/// - recupera o token da sessão;
+/// - consulta os endpoints necessários;
+/// - normaliza as respostas para a Home.
+class HomeService {
+  HomeService({
+    required this._authService,
+    required this._pacienteApiService,
+  });
+
+  final AuthService _authService;
+  final PacienteApiService _pacienteApiService;
+
+  /// Carrega os dados necessários para a Home.
+  Future<Map<String, dynamic>> carregar() async {
+    final token = await _authService.obterToken();
+
+    if (token == null || token.isEmpty) {
+      throw const HomeException(
+        'Sessão de autenticação não encontrada.',
+      );
+    }
+
+    final resultados = await Future.wait([
+      _pacienteApiService.obterResumo(
+        token: token,
+      ),
+      _pacienteApiService.obterPerfil(
+        token: token,
+      ),
+      _pacienteApiService.obterAgenda(
+        token: token,
+      ),
+      _pacienteApiService.obterPlano(
+        token: token,
+      ),
+      _pacienteApiService.obterExames(
+        token: token,
+      ),
+      _pacienteApiService.obterAvaliacao(
+        token: token,
+      ),
+      _pacienteApiService.obterPrescricao(
+        token: token,
+      ),
+      _pacienteApiService.obterMedidas(
+        token: token,
+      ),
+    ]);
+
+    final resumo = _mapa(resultados[0]);
+    final perfil = _mapa(resultados[1]);
+    final agenda = _mapa(resultados[2]);
+    final plano = _mapa(resultados[3]);
+    final exames = _mapa(resultados[4]);
+    final avaliacao = _mapa(resultados[5]);
+    final prescricao = _mapa(resultados[6]);
+    final medidas = _mapa(resultados[7]);
+
+    return {
+      'resumo': resumo,
+      'perfil': perfil,
+      'agenda': _normalizarLista(
+        agenda,
+        'agenda',
+      ),
+      'plano': _normalizarLista(
+        plano,
+        'planos',
+      ),
+      'exames': _normalizarLista(
+        exames,
+        'exames',
+      ),
+      'avaliacao': _normalizarLista(
+        avaliacao,
+        'avaliacoes',
+      ),
+      'prescricao': _normalizarLista(
+        prescricao,
+        'prescricoes',
+      ),
+      'medidas': _normalizarLista(
+        medidas,
+        'medidas',
+      ),
+    };
+  }
+
+  /// Garante que a resposta da API seja tratada
+  /// como um mapa.
+  Map<String, dynamic> _mapa(
+      dynamic resposta,
+      ) {
+    if (resposta is Map<String, dynamic>) {
+      return resposta;
+    }
+
+    return {};
+  }
+
+  /// Extrai uma lista da resposta da API.
+  List<dynamic> _normalizarLista(
+      Map<String, dynamic> resposta,
+      String chave,
+      ) {
+    final valor = resposta[chave];
+
+    if (valor is List) {
+      return valor;
+    }
+
+    return [];
+  }
+}
+
+/// Exceção específica da Home.
+class HomeException implements Exception {
+  const HomeException(this.message);
+
+  final String message;
+
+  @override
+  String toString() {
+    return message;
+  }
+}
