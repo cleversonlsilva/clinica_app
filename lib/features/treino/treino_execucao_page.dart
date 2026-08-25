@@ -1,26 +1,27 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
-/// Tela interativa para execução de um treino.
+/// Tela interativa para execuÃ§Ã£o de um treino.
 ///
 /// Responsabilidades:
-/// - controlar o exercício atual;
-/// - controlar a série atual;
-/// - controlar o tempo de execução;
+/// - controlar o exercÃ­cio atual;
+/// - controlar a sÃ©rie atual;
+/// - controlar o tempo de execuÃ§Ã£o;
 /// - controlar o descanso;
-/// - avançar entre séries;
-/// - avançar entre exercícios;
+/// - avanÃ§ar entre sÃ©ries;
+/// - avanÃ§ar entre exercÃ­cios;
 /// - finalizar o treino;
-/// - informar ao responsável pela navegação quando o treino
-///   for concluído.
+/// - informar ao responsÃ¡vel pela navegaÃ§Ã£o quando o treino
+///   for concluÃ­do.
 ///
-/// Os valores de séries, repetições, carga, tempo e descanso
-/// são recebidos do backend através do mapa do exercício.
+/// Os valores de sÃ©ries, repetiÃ§Ãµes, carga, tempo e descanso
+/// sÃ£o recebidos do backend atravÃ©s do mapa do exercÃ­cio.
 ///
-/// Esta tela não realiza diretamente requisições HTTP.
-/// O registro persistente da execução é realizado pelo
-/// responsável pela navegação através do callback
+/// Esta tela nÃ£o realiza diretamente requisiÃ§Ãµes HTTP.
+/// O registro persistente da execuÃ§Ã£o Ã© realizado pelo
+/// responsÃ¡vel pela navegaÃ§Ã£o atravÃ©s do callback
 /// [onTreinoConcluido].
 class TreinoExecucaoPage extends StatefulWidget {
   const TreinoExecucaoPage({
@@ -29,22 +30,35 @@ class TreinoExecucaoPage extends StatefulWidget {
     required this.exercicios,
     this.exercicioInicial = 0,
     this.onTreinoConcluido,
+    this.onCorridaConcluida,
   });
 
   final Map<String, dynamic> treino;
   final List<Map<String, dynamic>> exercicios;
   final int exercicioInicial;
 
-  /// Callback chamado somente quando todos os exercícios
-  /// e todas as séries do treino forem concluídos.
+  /// Callback chamado somente quando todos os exercÃ­cios
+  /// e todas as sÃ©ries do treino forem concluÃ­dos.
   ///
-  /// Parâmetros:
+  /// ParÃ¢metros:
   /// - primeiro: ID do treino;
-  /// - segundo: tempo total da execução em segundos.
+  /// - segundo: tempo total da execuÃ§Ã£o em segundos.
   final Future<void> Function(
       int treinoId,
       int tempoTotalSegundos,
       )? onTreinoConcluido;
+
+  /// Callback opcional específico para registrar uma corrida.
+  ///
+  /// Recebe ID do treino, tempo em segundos, distância em metros,
+  /// pace médio em minutos/km e a rota com latitude/longitude.
+  final Future<void> Function(
+      int treinoId,
+      int tempoTotalSegundos,
+      double distanciaMetros,
+      double paceMedio,
+      List<Map<String, double>> rota,
+      )? onCorridaConcluida;
 
   @override
   State<TreinoExecucaoPage> createState() =>
@@ -61,7 +75,7 @@ class _TreinoExecucaoPageState
 
   int _segundosRestantes = 0;
 
-  /// Tempo total efetivamente decorrido durante a execução.
+  /// Tempo total efetivamente decorrido durante a execuÃ§Ã£o.
   int _tempoTotalExecucao = 0;
 
   bool _executando = false;
@@ -71,6 +85,76 @@ class _TreinoExecucaoPageState
   bool _execucaoRegistrada = false;
 
   DateTime? _inicioExecucao;
+
+  // ==========================================================
+  // CORRIDA / GPS
+  // ==========================================================
+
+  StreamSubscription<Position>? _corridaPosicaoSubscription;
+  Timer? _corridaTimer;
+
+  DateTime? _corridaInicio;
+  Duration _corridaTempoAcumulado = Duration.zero;
+
+  double _corridaDistanciaMetros = 0;
+  final List<Map<String, double>> _corridaRota = [];
+
+  bool _corridaPreparando = false;
+  bool _corridaEmAndamento = false;
+  bool _corridaPausada = false;
+  bool _corridaFinalizada = false;
+
+  String? _corridaErro;
+
+  bool get _ehCorrida {
+    final tipo = widget.treino['tipo'] ??
+        widget.treino['tipo_treino'];
+
+    return tipo?.toString().toLowerCase().trim() == 'corrida';
+  }
+
+  int get _corridaTempoSegundos {
+    var total = _corridaTempoAcumulado.inSeconds;
+
+    if (_corridaEmAndamento &&
+        _corridaInicio != null) {
+      total += DateTime.now()
+          .difference(_corridaInicio!)
+          .inSeconds;
+    }
+
+    return total;
+  }
+
+  double get _corridaDistanciaKm {
+    return _corridaDistanciaMetros / 1000;
+  }
+
+  String get _corridaPace {
+    if (_corridaDistanciaKm <= 0) {
+      return '--:--';
+    }
+
+    final minutosPorKm =
+        (_corridaTempoSegundos / 60) /
+            _corridaDistanciaKm;
+
+    if (!minutosPorKm.isFinite ||
+        minutosPorKm <= 0) {
+      return '--:--';
+    }
+
+    final minutos = minutosPorKm.floor();
+    final segundos =
+    ((minutosPorKm - minutos) * 60).round();
+
+    if (segundos >= 60) {
+      return '${(minutos + 1).toString().padLeft(2, '0')}:00';
+    }
+
+    return '${minutos.toString().padLeft(2, '0')}:'
+        '${segundos.toString().padLeft(2, '0')}';
+  }
 
   @override
   void initState() {
@@ -84,16 +168,300 @@ class _TreinoExecucaoPageState
         widget.exercicios.length - 1,
       );
     }
+
+    if (_ehCorrida) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _prepararCorrida();
+      });
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _corridaTimer?.cancel();
+    _corridaPosicaoSubscription?.cancel();
     super.dispose();
   }
 
   // ==========================================================
-  // EXERCÍCIO ATUAL
+  // GPS / CORRIDA
+  // ==========================================================
+
+  Future<void> _prepararCorrida() async {
+    if (!_ehCorrida || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _corridaPreparando = true;
+      _corridaErro = null;
+    });
+
+    try {
+      final servicoAtivo =
+      await Geolocator.isLocationServiceEnabled();
+
+      if (!servicoAtivo) {
+        if (!mounted) return;
+
+        setState(() {
+          _corridaPreparando = false;
+          _corridaErro =
+          'O GPS do aparelho está desligado. '
+              'Ative a localização e tente novamente.';
+        });
+        return;
+      }
+
+      var permissao = await Geolocator.checkPermission();
+
+      if (permissao == LocationPermission.denied) {
+        permissao = await Geolocator.requestPermission();
+      }
+
+      if (permissao == LocationPermission.denied) {
+        if (!mounted) return;
+
+        setState(() {
+          _corridaPreparando = false;
+          _corridaErro = 'Permissão de localização negada.';
+        });
+        return;
+      }
+
+      if (permissao == LocationPermission.deniedForever) {
+        if (!mounted) return;
+
+        setState(() {
+          _corridaPreparando = false;
+          _corridaErro =
+          'A localização foi bloqueada nas configurações '
+              'do aplicativo.';
+        });
+        return;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _corridaPreparando = false;
+        _corridaErro = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _corridaPreparando = false;
+        _corridaErro = 'Não foi possível preparar o GPS.';
+      });
+    }
+  }
+
+  Future<void> _abrirConfiguracoesLocalizacao() async {
+    await Geolocator.openLocationSettings();
+    await _prepararCorrida();
+  }
+
+  Future<void> _abrirConfiguracoesAplicativo() async {
+    await Geolocator.openAppSettings();
+    await _prepararCorrida();
+  }
+
+  Future<void> _iniciarCorrida() async {
+    if (_corridaEmAndamento ||
+        _corridaFinalizada ||
+        _corridaPreparando) {
+      return;
+    }
+
+    await _prepararCorrida();
+
+    if (_corridaErro != null || !mounted) {
+      return;
+    }
+
+    _corridaInicio = DateTime.now();
+
+    setState(() {
+      _corridaEmAndamento = true;
+      _corridaPausada = false;
+      _corridaErro = null;
+    });
+
+    _corridaTimer?.cancel();
+    _corridaTimer = Timer.periodic(
+      const Duration(seconds: 1),
+          (_) {
+        if (!mounted || !_corridaEmAndamento) {
+          return;
+        }
+        setState(() {});
+      },
+    );
+
+    await _iniciarRastreamento();
+  }
+
+  Future<void> _iniciarRastreamento() async {
+    await _corridaPosicaoSubscription?.cancel();
+
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+    );
+
+    _corridaPosicaoSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: settings,
+        ).listen(
+          _receberPosicao,
+          onError: (_) {
+            if (!mounted) return;
+
+            setState(() {
+              _corridaErro =
+              'Não foi possível receber a localização.';
+            });
+          },
+        );
+  }
+
+  void _receberPosicao(Position position) {
+    if (!_corridaEmAndamento || !mounted) {
+      return;
+    }
+
+    if (position.latitude == 0 &&
+        position.longitude == 0) {
+      return;
+    }
+
+    final ultima = _corridaRota.isEmpty
+        ? null
+        : _corridaRota.last;
+
+    if (ultima != null) {
+      final distancia = Geolocator.distanceBetween(
+        ultima['lat']!,
+        ultima['lng']!,
+        position.latitude,
+        position.longitude,
+      );
+
+      // Ignora pequenas oscilações do GPS e saltos
+      // incompatíveis com uma corrida normal.
+      if (distancia >= 1 && distancia < 1000) {
+        _corridaDistanciaMetros += distancia;
+      }
+    }
+
+    _corridaRota.add({
+      'lat': position.latitude,
+      'lng': position.longitude,
+    });
+
+    if (_corridaRota.length > 5000) {
+      _corridaRota.removeAt(0);
+    }
+
+    setState(() {});
+  }
+
+  void _pausarCorrida() {
+    if (!_corridaEmAndamento) {
+      return;
+    }
+
+    if (_corridaInicio != null) {
+      _corridaTempoAcumulado +=
+          DateTime.now().difference(_corridaInicio!);
+    }
+
+    _corridaInicio = null;
+    _corridaTimer?.cancel();
+    _corridaPosicaoSubscription?.pause();
+
+    if (!mounted) return;
+
+    setState(() {
+      _corridaEmAndamento = false;
+      _corridaPausada = true;
+    });
+  }
+
+  Future<void> _retomarCorrida() async {
+    if (_corridaFinalizada || _corridaEmAndamento) {
+      return;
+    }
+
+    await _prepararCorrida();
+
+    if (_corridaErro != null || !mounted) {
+      return;
+    }
+
+    _corridaInicio = DateTime.now();
+
+    setState(() {
+      _corridaEmAndamento = true;
+      _corridaPausada = false;
+      _corridaErro = null;
+    });
+
+    _corridaTimer?.cancel();
+    _corridaTimer = Timer.periodic(
+      const Duration(seconds: 1),
+          (_) {
+        if (!mounted || !_corridaEmAndamento) {
+          return;
+        }
+        setState(() {});
+      },
+    );
+
+    await _iniciarRastreamento();
+  }
+
+  Future<void> _finalizarCorrida() async {
+    if (_corridaFinalizada) {
+      return;
+    }
+
+    if (_corridaEmAndamento &&
+        _corridaInicio != null) {
+      _corridaTempoAcumulado +=
+          DateTime.now().difference(_corridaInicio!);
+    }
+
+    _corridaInicio = null;
+    _corridaTimer?.cancel();
+    await _corridaPosicaoSubscription?.cancel();
+
+    if (!mounted) return;
+
+    setState(() {
+      _corridaEmAndamento = false;
+      _corridaPausada = false;
+      _corridaFinalizada = true;
+      _tempoTotalExecucao = _corridaTempoSegundos;
+      _treinoConcluido = true;
+      _registrandoExecucao = true;
+    });
+
+    await _registrarExecucao();
+  }
+
+  String _formatarDistancia(double km) {
+    if (km < 10) {
+      return km.toStringAsFixed(2);
+    }
+
+    return km.toStringAsFixed(1);
+  }
+
+  // ==========================================================
+  // EXERCÃCIO ATUAL
   // ==========================================================
 
   Map<String, dynamic>? get _exercicioAtual {
@@ -179,7 +547,7 @@ class _TreinoExecucaoPageState
 
   String get _nomeExercicio {
     return _exercicioAtual?['nome']?.toString() ??
-        'Exercício';
+        'ExercÃ­cio';
   }
 
   String get _repeticoes {
@@ -394,7 +762,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // CONCLUSÃO DA SÉRIE
+  // CONCLUSÃƒO DA SÃ‰RIE
   // ==========================================================
 
   void _mostrarConclusaoSerie() {
@@ -483,7 +851,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // PRÓXIMO EXERCÍCIO
+  // PRÃ“XIMO EXERCÃCIO
   // ==========================================================
 
   void _finalizarExercicio() {
@@ -516,7 +884,7 @@ class _TreinoExecucaoPageState
       ..showSnackBar(
         SnackBar(
           content: Text(
-            'Próximo exercício: $_nomeExercicio',
+            'PrÃ³ximo exercÃ­cio: $_nomeExercicio',
           ),
           duration: const Duration(seconds: 2),
         ),
@@ -524,7 +892,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // FINALIZAÇÃO DO TREINO
+  // FINALIZAÃ‡ÃƒO DO TREINO
   // ==========================================================
 
   Future<void> _finalizarTreino() async {
@@ -569,7 +937,17 @@ class _TreinoExecucaoPageState
 
     final callback = widget.onTreinoConcluido;
 
-    if (callback == null) {
+    if (!_ehCorrida && callback == null) {
+      if (mounted) {
+        setState(() {
+          _registrandoExecucao = false;
+        });
+      }
+      return;
+    }
+
+    if (_ehCorrida && widget.onCorridaConcluida == null &&
+        callback == null) {
       if (mounted) {
         setState(() {
           _registrandoExecucao = false;
@@ -579,10 +957,29 @@ class _TreinoExecucaoPageState
     }
 
     try {
-      await callback(
-        treinoId,
-        _tempoTotalExecucao,
-      );
+      if (_ehCorrida &&
+          widget.onCorridaConcluida != null) {
+        final distancia = _corridaDistanciaMetros;
+        final pace = _corridaDistanciaKm > 0
+            ? (_corridaTempoSegundos / 60) /
+            _corridaDistanciaKm
+            : 0.0;
+
+        await widget.onCorridaConcluida!(
+          treinoId,
+          _corridaTempoSegundos,
+          distancia,
+          pace,
+          List<Map<String, double>>.from(
+            _corridaRota,
+          ),
+        );
+      } else {
+        await callback!(
+          treinoId,
+          _tempoTotalExecucao,
+        );
+      }
 
       _execucaoRegistrada = true;
 
@@ -609,8 +1006,8 @@ class _TreinoExecucaoPageState
         ..showSnackBar(
           const SnackBar(
             content: Text(
-              'O treino foi concluído, mas não foi possível '
-                  'registrar a execução.',
+              'O treino foi concluÃ­do, mas nÃ£o foi possÃ­vel '
+                  'registrar a execuÃ§Ã£o.',
             ),
             duration: Duration(seconds: 4),
           ),
@@ -693,6 +1090,14 @@ class _TreinoExecucaoPageState
 
   @override
   Widget build(BuildContext context) {
+    if (_ehCorrida) {
+      if (_treinoConcluido) {
+        return _buildTreinoConcluido();
+      }
+
+      return _buildCorrida();
+    }
+
     if (widget.exercicios.isEmpty) {
       return _buildSemExercicios();
     }
@@ -705,7 +1110,7 @@ class _TreinoExecucaoPageState
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Execução do treino',
+          'ExecuÃ§Ã£o do treino',
           style: TextStyle(
             fontWeight: FontWeight.w800,
           ),
@@ -735,6 +1140,463 @@ class _TreinoExecucaoPageState
         ),
       ),
     );
+  }
+
+
+  // ==========================================================
+  // INTERFACE DA CORRIDA
+  // ==========================================================
+
+  Widget _buildCorrida() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        title: const Text(
+          'Corrida',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1F2937),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            30,
+          ),
+          children: [
+            _buildCabecalhoCorrida(),
+            const SizedBox(height: 14),
+            _buildMetricasCorrida(),
+            const SizedBox(height: 14),
+            _buildStatusGps(),
+            const SizedBox(height: 16),
+            _buildControlesCorrida(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCabecalhoCorrida() {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF2563EB),
+            Color(0xFF1D4ED8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x2E2563EB),
+            blurRadius: 18,
+            offset: Offset(0, 7),
+          ),
+        ],
+      ),
+      child: const Row(
+        children: [
+          CircleAvatar(
+            radius: 29,
+            backgroundColor: Color(0x33FFFFFF),
+            child: Icon(
+              Icons.directions_run_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+          SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Corrida em execução',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 5),
+                Text(
+                  'O aplicativo acompanhará tempo, distância e rota.',
+                  style: TextStyle(
+                    color: Color(0xE6FFFFFF),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricasCorrida() {
+    return Row(
+      children: [
+        Expanded(
+          child: _MetricaCorrida(
+            icone: Icons.timer_outlined,
+            titulo: 'Tempo',
+            valor: _formatarTempo(
+              _corridaTempoSegundos,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MetricaCorrida(
+            icone: Icons.straighten_rounded,
+            titulo: 'Distância',
+            valor:
+            '${_formatarDistancia(_corridaDistanciaKm)} km',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MetricaCorrida(
+            icone: Icons.speed_rounded,
+            titulo: 'Pace',
+            valor: _corridaPace,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatusGps() {
+    final erro = _corridaErro;
+
+    if (_corridaPreparando) {
+      return _CaixaStatusCorrida(
+        icone: Icons.gps_fixed_rounded,
+        titulo: 'Preparando GPS',
+        mensagem:
+        'Solicitando acesso à localização do aparelho...',
+        cor: const Color(0xFF2563EB),
+        carregando: true,
+      );
+    }
+
+    if (erro != null) {
+      final bloqueado = erro.contains(
+        'bloqueada',
+      );
+
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFFECACA),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.location_off_rounded,
+                  color: Color(0xFFDC2626),
+                ),
+                SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'GPS indisponível',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              erro,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: Color(0xFF7F1D1D),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (bloqueado)
+                  OutlinedButton.icon(
+                    onPressed:
+                    _abrirConfiguracoesAplicativo,
+                    icon: const Icon(
+                      Icons.settings_rounded,
+                    ),
+                    label: const Text(
+                      'Abrir configurações',
+                    ),
+                  )
+                else
+                  ElevatedButton.icon(
+                    onPressed: _prepararCorrida,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                    ),
+                    label: const Text(
+                      'Tentar novamente',
+                    ),
+                  ),
+                if (erro.contains('GPS'))
+                  OutlinedButton.icon(
+                    onPressed:
+                    _abrirConfiguracoesLocalizacao,
+                    icon: const Icon(
+                      Icons.location_on_rounded,
+                    ),
+                    label: const Text(
+                      'Ativar GPS',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_corridaEmAndamento) {
+      return const _CaixaStatusCorrida(
+        icone: Icons.gps_fixed_rounded,
+        titulo: 'GPS ativo',
+        mensagem:
+        'Sua posição está sendo acompanhada durante a corrida.',
+        cor: Color(0xFF16A34A),
+      );
+    }
+
+    if (_corridaPausada) {
+      return const _CaixaStatusCorrida(
+        icone: Icons.pause_circle_outline_rounded,
+        titulo: 'Corrida pausada',
+        mensagem:
+        'A rota e o cronômetro estão pausados.',
+        cor: Color(0xFFEA580C),
+      );
+    }
+
+    return const _CaixaStatusCorrida(
+      icone: Icons.location_on_rounded,
+      titulo: 'GPS pronto',
+      mensagem:
+      'Tudo pronto. Toque em iniciar para começar o rastreamento.',
+      cor: Color(0xFF2563EB),
+    );
+  }
+
+  Widget _buildControlesCorrida() {
+    if (_corridaFinalizada) {
+      return const SizedBox.shrink();
+    }
+
+    if (_corridaPreparando) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_corridaEmAndamento) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _pausarCorrida,
+              icon: const Icon(
+                Icons.pause_rounded,
+              ),
+              label: const Text(
+                'Pausar corrida',
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize:
+                const Size.fromHeight(54),
+                backgroundColor:
+                const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmarFinalizacaoCorrida,
+              icon: const Icon(
+                Icons.flag_rounded,
+              ),
+              label: const Text(
+                'Finalizar corrida',
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize:
+                const Size.fromHeight(52),
+                foregroundColor:
+                const Color(0xFFDC2626),
+                side: const BorderSide(
+                  color: Color(0xFFFCA5A5),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_corridaPausada) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _retomarCorrida,
+              icon: const Icon(
+                Icons.play_arrow_rounded,
+              ),
+              label: const Text(
+                'Retomar corrida',
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize:
+                const Size.fromHeight(54),
+                backgroundColor:
+                const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmarFinalizacaoCorrida,
+              icon: const Icon(
+                Icons.flag_rounded,
+              ),
+              label: const Text(
+                'Finalizar corrida',
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize:
+                const Size.fromHeight(52),
+                foregroundColor:
+                const Color(0xFFDC2626),
+                side: const BorderSide(
+                  color: Color(0xFFFCA5A5),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _iniciarCorrida,
+        icon: const Icon(
+          Icons.play_arrow_rounded,
+        ),
+        label: const Text(
+          'Iniciar corrida',
+        ),
+        style: ElevatedButton.styleFrom(
+          minimumSize:
+          const Size.fromHeight(56),
+          backgroundColor:
+          const Color(0xFF16A34A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmarFinalizacaoCorrida() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Finalizar corrida?',
+          ),
+          content: const Text(
+            'A distância, o tempo e a rota registrados '
+                'até este momento serão mantidos.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext)
+                    .pop(false);
+              },
+              child: const Text('Continuar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext)
+                    .pop(true);
+              },
+              child: const Text('Finalizar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true) {
+      await _finalizarCorrida();
+    }
   }
 
   // ==========================================================
@@ -798,7 +1660,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // EXERCÍCIO
+  // EXERCÃCIO
   // ==========================================================
 
   Widget _buildExercicio() {
@@ -824,7 +1686,7 @@ class _TreinoExecucaoPageState
             child: Column(
               children: [
                 Text(
-                  'EXERCÍCIO $_numeroExercicio',
+                  'EXERCÃCIO $_numeroExercicio',
                   style: const TextStyle(
                     fontSize: 11,
                     letterSpacing: 1.1,
@@ -912,7 +1774,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // SÉRIE
+  // SÃ‰RIE
   // ==========================================================
 
   Widget _buildSerieAtual() {
@@ -929,7 +1791,7 @@ class _TreinoExecucaoPageState
       child: Column(
         children: [
           const Text(
-            'SÉRIE ATUAL',
+            'SÃ‰RIE ATUAL',
             style: TextStyle(
               fontSize: 11,
               letterSpacing: 1,
@@ -952,7 +1814,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // PARÂMETROS
+  // PARÃ‚METROS
   // ==========================================================
 
   Widget _buildParametrosExecucao() {
@@ -963,7 +1825,7 @@ class _TreinoExecucaoPageState
         _InfoExecucao(
           icone:
           Icons.format_list_numbered_rounded,
-          titulo: 'Repetições',
+          titulo: 'RepetiÃ§Ãµes',
           valor: _repeticoes,
         ),
       );
@@ -1018,7 +1880,7 @@ class _TreinoExecucaoPageState
         _InfoExecucao(
           icone:
           Icons.directions_run_rounded,
-          titulo: 'Execução',
+          titulo: 'ExecuÃ§Ã£o',
           valor: _formatarTexto(_tipoExecucao),
         ),
       );
@@ -1042,7 +1904,7 @@ class _TreinoExecucaoPageState
         if (_executando &&
             _tempoExercicioSegundos > 0) ...[
           _buildCronometro(
-            titulo: 'Tempo do exercício',
+            titulo: 'Tempo do exercÃ­cio',
           ),
           const SizedBox(height: 14),
         ],
@@ -1056,8 +1918,8 @@ class _TreinoExecucaoPageState
               ),
               label: Text(
                 _tempoExercicioSegundos > 0
-                    ? 'Iniciar exercício'
-                    : 'Iniciar série',
+                    ? 'Iniciar exercÃ­cio'
+                    : 'Iniciar sÃ©rie',
               ),
               style: ElevatedButton.styleFrom(
                 minimumSize:
@@ -1106,7 +1968,7 @@ class _TreinoExecucaoPageState
                 Icons.check_rounded,
               ),
               label: const Text(
-                'Concluir série',
+                'Concluir sÃ©rie',
               ),
               style: ElevatedButton.styleFrom(
                 minimumSize:
@@ -1128,7 +1990,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // CRONÔMETRO
+  // CRONÃ”METRO
   // ==========================================================
 
   Widget _buildCronometro({
@@ -1208,7 +2070,7 @@ class _TreinoExecucaoPageState
           ),
           const SizedBox(height: 6),
           const Text(
-            'Prepare-se para a próxima série.',
+            'Prepare-se para a prÃ³xima sÃ©rie.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -1255,7 +2117,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // TREINO CONCLUÍDO
+  // TREINO CONCLUÃDO
   // ==========================================================
 
   Widget _buildTreinoConcluido() {
@@ -1263,7 +2125,7 @@ class _TreinoExecucaoPageState
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Treino concluído',
+          'Treino concluÃ­do',
           style: TextStyle(
             fontWeight: FontWeight.w800,
           ),
@@ -1294,7 +2156,7 @@ class _TreinoExecucaoPageState
               ),
               const SizedBox(height: 24),
               const Text(
-                'Treino concluído!',
+                'Treino concluÃ­do!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28,
@@ -1304,8 +2166,8 @@ class _TreinoExecucaoPageState
               ),
               const SizedBox(height: 10),
               const Text(
-                'Parabéns! Você completou todos '
-                    'os exercícios deste treino.',
+                'ParabÃ©ns! VocÃª completou todos '
+                    'os exercÃ­cios deste treino.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -1394,7 +2256,7 @@ class _TreinoExecucaoPageState
   }
 
   // ==========================================================
-  // SEM EXERCÍCIOS
+  // SEM EXERCÃCIOS
   // ==========================================================
 
   Widget _buildSemExercicios() {
@@ -1402,7 +2264,7 @@ class _TreinoExecucaoPageState
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Execução do treino',
+          'ExecuÃ§Ã£o do treino',
           style: TextStyle(
             fontWeight: FontWeight.w800,
           ),
@@ -1425,7 +2287,7 @@ class _TreinoExecucaoPageState
               ),
               SizedBox(height: 16),
               Text(
-                'Nenhum exercício disponível',
+                'Nenhum exercÃ­cio disponÃ­vel',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 19,
@@ -1435,8 +2297,8 @@ class _TreinoExecucaoPageState
               ),
               SizedBox(height: 8),
               Text(
-                'Este treino não possui exercícios '
-                    'para execução.',
+                'Este treino nÃ£o possui exercÃ­cios '
+                    'para execuÃ§Ã£o.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -1453,8 +2315,148 @@ class _TreinoExecucaoPageState
 }
 
 // ============================================================
-// INFORMAÇÃO DE EXECUÇÃO
+// INFORMAÃ‡ÃƒO DE EXECUÃ‡ÃƒO
 // ============================================================
+
+
+// ============================================================
+// COMPONENTES DA CORRIDA
+// ============================================================
+
+class _MetricaCorrida extends StatelessWidget {
+  const _MetricaCorrida({
+    required this.icone,
+    required this.titulo,
+    required this.valor,
+  });
+
+  final IconData icone;
+  final String titulo;
+  final String valor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icone,
+            size: 20,
+            color: const Color(0xFF2563EB),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            titulo,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              valor,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaixaStatusCorrida extends StatelessWidget {
+  const _CaixaStatusCorrida({
+    required this.icone,
+    required this.titulo,
+    required this.mensagem,
+    required this.cor,
+    this.carregando = false,
+  });
+
+  final IconData icone;
+  final String titulo;
+  final String mensagem;
+  final Color cor;
+  final bool carregando;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: cor.withValues(alpha: 0.20),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          if (carregando)
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: cor,
+              ),
+            )
+          else
+            Icon(
+              icone,
+              color: cor,
+              size: 22,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: cor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  mensagem,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _InfoExecucao extends StatelessWidget {
   const _InfoExecucao({

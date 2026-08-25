@@ -5,27 +5,17 @@ import 'treino_service.dart';
 
 /// Tela de detalhes de um treino.
 ///
-/// Apresenta:
-/// - tipo do treino;
-/// - objetivo;
-/// - período;
-/// - observações;
-/// - exercícios;
-/// - séries;
-/// - repetições;
-/// - carga;
-/// - tempo;
-/// - descanso;
-/// - grupo muscular;
-/// - equipamento;
-/// - vídeo e imagem quando disponíveis.
+/// Mantém dois fluxos independentes:
 ///
-/// A execução interativa é realizada pela
-/// TreinoExecucaoPage.
+/// - Academia:
+///   apresenta exercícios e permite iniciar a execução
+///   tradicional de séries/repetições.
 ///
-/// O registro da execução é delegado ao callback
-/// [onTreinoConcluido], mantendo a comunicação HTTP
-/// fora desta tela.
+/// - Corrida:
+///   apresenta a prescrição da corrida e disponibiliza
+///   o botão para iniciar a execução GPS.
+///
+/// A comunicação HTTP permanece fora desta tela.
 class TreinoDetalhePage extends StatelessWidget {
   const TreinoDetalhePage({
     super.key,
@@ -38,14 +28,7 @@ class TreinoDetalhePage extends StatelessWidget {
   final TreinoService treinoService;
 
   /// Callback chamado quando o paciente conclui
-  /// todos os exercícios e séries do treino.
-  ///
-  /// Parâmetros:
-  /// - primeiro: ID do treino;
-  /// - segundo: tempo total da execução em segundos.
-  ///
-  /// O callback é opcional para manter compatibilidade
-  /// com chamadas existentes da tela.
+  /// o treino de academia.
   final Future<void> Function(
       int treinoId,
       int tempoTotalSegundos,
@@ -61,9 +44,6 @@ class TreinoDetalhePage extends StatelessWidget {
     final observacoes =
     treinoService.observacoesTreino(treino);
 
-    final exercicios =
-    treinoService.obterExercicios(treino);
-
     final dataInicio =
     treinoService.dataInicioTreino(treino);
 
@@ -71,6 +51,11 @@ class TreinoDetalhePage extends StatelessWidget {
     treinoService.dataFimTreino(treino);
 
     final tipoInfo = _tipoInfo(tipo);
+
+    final ehCorrida = tipo.toLowerCase() == 'corrida';
+
+    final exercicios =
+    treinoService.obterExercicios(treino);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -93,6 +78,10 @@ class TreinoDetalhePage extends StatelessWidget {
           32,
         ),
         children: [
+          // ====================================================
+          // CABEÇALHO
+          // ====================================================
+
           _buildCabecalho(
             context,
             tipoInfo,
@@ -100,33 +89,59 @@ class TreinoDetalhePage extends StatelessWidget {
             dataInicio,
             dataFim,
           ),
+
+          // ====================================================
+          // OBSERVAÇÕES GERAIS
+          // ====================================================
+
           if (observacoes.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildObservacoes(observacoes),
           ],
-          const SizedBox(height: 22),
-          _buildTituloExercicios(
-            exercicios.length,
-          ),
-          const SizedBox(height: 12),
-          if (exercicios.isEmpty)
-            _buildSemExercicios()
-          else
-            ...exercicios.asMap().entries.map(
-                  (entry) {
-                return Padding(
-                  padding:
-                  const EdgeInsets.only(
-                    bottom: 14,
-                  ),
-                  child: _buildExercicioCard(
-                    context,
-                    entry.value,
-                    entry.key + 1,
-                  ),
-                );
-              },
+
+          // ====================================================
+          // CORRIDA
+          // ====================================================
+
+          if (ehCorrida) ...[
+            const SizedBox(height: 22),
+            _buildCorrida(
+              context,
             ),
+          ]
+
+          // ====================================================
+          // ACADEMIA
+          // ====================================================
+
+          else ...[
+            const SizedBox(height: 22),
+
+            _buildTituloExercicios(
+              exercicios.length,
+            ),
+
+            const SizedBox(height: 12),
+
+            if (exercicios.isEmpty)
+              _buildSemExercicios()
+            else
+              ...exercicios.asMap().entries.map(
+                    (entry) {
+                  return Padding(
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 14,
+                    ),
+                    child: _buildExercicioCard(
+                      context,
+                      entry.value,
+                      entry.key + 1,
+                    ),
+                  );
+                },
+              ),
+          ],
         ],
       ),
     );
@@ -151,10 +166,13 @@ class TreinoDetalhePage extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             tipoInfo.cor,
-            tipoInfo.cor.withValues(alpha: 0.72),
+            tipoInfo.cor.withValues(
+              alpha: 0.72,
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius:
+        BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: tipoInfo.cor.withValues(
@@ -175,7 +193,8 @@ class TreinoDetalhePage extends StatelessWidget {
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(
+                  color:
+                  Colors.white.withValues(
                     alpha: 0.18,
                   ),
                   borderRadius:
@@ -198,7 +217,8 @@ class TreinoDetalhePage extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                        fontWeight:
+                        FontWeight.w800,
                       ),
                     ),
                     if (objetivo.isNotEmpty) ...[
@@ -206,7 +226,8 @@ class TreinoDetalhePage extends StatelessWidget {
                       Text(
                         objetivo,
                         style: TextStyle(
-                          color: Colors.white.withValues(
+                          color: Colors.white
+                              .withValues(
                             alpha: 0.92,
                           ),
                           fontSize: 14,
@@ -218,11 +239,15 @@ class TreinoDetalhePage extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(height: 20),
+
           Container(
-            padding: const EdgeInsets.all(13),
+            padding:
+            const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(
+              color:
+              Colors.white.withValues(
                 alpha: 0.12,
               ),
               borderRadius:
@@ -242,14 +267,849 @@ class TreinoDetalhePage extends StatelessWidget {
                       dataInicio,
                       dataFim,
                     ),
-                    style: const TextStyle(
+                    style:
+                    const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontWeight:
+                      FontWeight.w600,
                     ),
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // CORRIDA
+  // ==========================================================
+
+  Widget _buildCorrida(
+      BuildContext context,
+      ) {
+    final corridas =
+    _obterCorridas();
+
+    if (corridas.isEmpty) {
+      return _buildCorridaSemPrescricao();
+    }
+
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Prescrição da corrida',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ),
+            Container(
+              padding:
+              const EdgeInsets.symmetric(
+                horizontal: 11,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(
+                  0xFFEFF6FF,
+                ),
+                borderRadius:
+                BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${corridas.length}',
+                style:
+                const TextStyle(
+                  color: Color(0xFF2563EB),
+                  fontSize: 13,
+                  fontWeight:
+                  FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        ...corridas.asMap().entries.map(
+              (entry) {
+            final corrida =
+                entry.value;
+
+            return Padding(
+              padding:
+              const EdgeInsets.only(
+                bottom: 14,
+              ),
+              child: _buildCorridaCard(
+                context,
+                corrida,
+                entry.key + 1,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // ==========================================================
+  // OBTER CORRIDAS
+  // ==========================================================
+
+  List<Map<String, dynamic>> _obterCorridas() {
+    final valor =
+    treino['corridas'];
+
+    if (valor is! List) {
+      return [];
+    }
+
+    return valor
+        .whereType<Map>()
+        .map(
+          (item) => Map<String, dynamic>.from(
+        item,
+      ),
+    )
+        .toList();
+  }
+
+  // ==========================================================
+  // CARD DA CORRIDA
+  // ==========================================================
+
+  Widget _buildCorridaCard(
+      BuildContext context,
+      Map<String, dynamic> corrida,
+      int numero,
+      ) {
+    final dia =
+    _texto(corrida['dia']);
+
+    final modo =
+    _texto(corrida['modo']);
+
+    final objetivo =
+    _texto(corrida['objetivo']);
+
+    final nivel =
+    _texto(corrida['nivel']);
+
+    final observacoes =
+    _texto(corrida['observacoes']);
+
+    final repeticoes =
+    _numero(corrida['repeticoes']);
+
+    final distanciaTotal =
+    _numeroDouble(
+      corrida['distancia_total'],
+    );
+
+    final tempoEstimado =
+    _numero(corrida['tempo_estimado']);
+
+    final blocos =
+    _obterBlocos(corrida);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+        BorderRadius.circular(21),
+        boxShadow: [
+          BoxShadow(
+            color:
+            Colors.black.withValues(
+              alpha: 0.045,
+            ),
+            blurRadius: 13,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding:
+        const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+          children: [
+            // ==================================================
+            // TÍTULO
+            // ==================================================
+
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  alignment:
+                  Alignment.center,
+                  decoration:
+                  BoxDecoration(
+                    color: const Color(
+                      0xFFEFF6FF,
+                    ),
+                    borderRadius:
+                    BorderRadius.circular(
+                      14,
+                    ),
+                  ),
+                  child: Text(
+                    dia.isEmpty
+                        ? numero.toString()
+                        : dia,
+                    style:
+                    const TextStyle(
+                      color: Color(
+                        0xFF2563EB,
+                      ),
+                      fontSize: 17,
+                      fontWeight:
+                      FontWeight.w900,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dia.isEmpty
+                            ? 'Corrida'
+                            : 'Corrida $dia',
+                        style:
+                        const TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                          FontWeight.w800,
+                          color: Color(
+                            0xFF1F2937,
+                          ),
+                        ),
+                      ),
+                      if (modo.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatarTexto(
+                            modo,
+                          ),
+                          style:
+                          const TextStyle(
+                            fontSize: 12,
+                            color: Color(
+                              0xFF64748B,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // ==================================================
+            // PARÂMETROS
+            // ==================================================
+
+            _buildParametrosCorrida(
+              repeticoes:
+              repeticoes,
+              distancia:
+              distanciaTotal,
+              tempoEstimado:
+              tempoEstimado,
+              nivel: nivel,
+            ),
+
+            // ==================================================
+            // OBJETIVO
+            // ==================================================
+
+            if (objetivo.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _buildInformacaoCorrida(
+                icone:
+                Icons.flag_rounded,
+                titulo: 'Objetivo',
+                valor: objetivo,
+              ),
+            ],
+
+            // ==================================================
+            // BLOCOS
+            // ==================================================
+
+            if (blocos.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              _buildTituloBlocos(
+                blocos.length,
+              ),
+              const SizedBox(height: 10),
+              ...blocos.asMap().entries.map(
+                    (entry) {
+                  return Padding(
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 8,
+                    ),
+                    child:
+                    _buildBlocoCorrida(
+                      entry.value,
+                      entry.key + 1,
+                    ),
+                  );
+                },
+              ),
+            ],
+
+            // ==================================================
+            // OBSERVAÇÕES
+            // ==================================================
+
+            if (observacoes.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _buildObservacaoCorrida(
+                observacoes,
+              ),
+            ],
+
+            const SizedBox(height: 18),
+
+            // ==================================================
+            // INICIAR
+            // ==================================================
+
+            _buildBotaoIniciarCorrida(
+              context,
+              corrida,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================================
+  // PARÂMETROS DA CORRIDA
+  // ==========================================================
+
+  Widget _buildParametrosCorrida({
+    required int? repeticoes,
+    required double? distancia,
+    required int? tempoEstimado,
+    required String nivel,
+  }) {
+    final itens = <Widget>[];
+
+    if (distancia != null &&
+        distancia > 0) {
+      itens.add(
+        _ParametroCorrida(
+          icone:
+          Icons.straighten_rounded,
+          titulo: 'Distância',
+          valor:
+          '${_formatarNumero(distancia)} m',
+        ),
+      );
+    }
+
+    if (repeticoes != null &&
+        repeticoes > 0) {
+      itens.add(
+        _ParametroCorrida(
+          icone:
+          Icons.repeat_rounded,
+          titulo: 'Repetições',
+          valor:
+          repeticoes.toString(),
+        ),
+      );
+    }
+
+    if (tempoEstimado != null &&
+        tempoEstimado > 0) {
+      itens.add(
+        _ParametroCorrida(
+          icone:
+          Icons.timer_outlined,
+          titulo: 'Tempo estimado',
+          valor:
+          _formatarTempoMinutos(
+            tempoEstimado,
+          ),
+        ),
+      );
+    }
+
+    if (nivel.isNotEmpty) {
+      itens.add(
+        _ParametroCorrida(
+          icone:
+          Icons.speed_rounded,
+          titulo: 'Nível',
+          valor:
+          _formatarTexto(nivel),
+        ),
+      );
+    }
+
+    if (itens.isEmpty) {
+      return _buildInformacaoCorrida(
+        icone:
+        Icons.info_outline_rounded,
+        titulo: 'Prescrição',
+        valor:
+        'Parâmetros não informados.',
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: itens,
+    );
+  }
+
+  // ==========================================================
+  // TÍTULO DOS BLOCOS
+  // ==========================================================
+
+  Widget _buildTituloBlocos(
+      int quantidade,
+      ) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Blocos da corrida',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight:
+              FontWeight.w800,
+              color: Color(
+                0xFF334155,
+              ),
+            ),
+          ),
+        ),
+        Container(
+          padding:
+          const EdgeInsets.symmetric(
+            horizontal: 9,
+            vertical: 5,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(
+              0xFFF1F5F9,
+            ),
+            borderRadius:
+            BorderRadius.circular(
+              15,
+            ),
+          ),
+          child: Text(
+            '$quantidade',
+            style:
+            const TextStyle(
+              fontSize: 11,
+              fontWeight:
+              FontWeight.w800,
+              color: Color(
+                0xFF64748B,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================================
+  // BLOCO
+  // ==========================================================
+
+  Widget _buildBlocoCorrida(
+      Map<String, dynamic> bloco,
+      int numero,
+      ) {
+    final tipo =
+    _texto(bloco['tipo']);
+
+    final distancia =
+    _numeroDouble(
+      bloco['distancia'],
+    );
+
+    final ordem =
+        _numero(bloco['ordem']) ??
+            numero;
+
+    String descricao;
+
+    if (distancia != null &&
+        distancia > 0) {
+      descricao =
+      '${_formatarNumero(distancia)} m';
+    } else {
+      descricao =
+      'Distância não informada';
+    }
+
+    return Container(
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 11,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFFF8FAFC,
+        ),
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(
+            0xFFE2E8F0,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment:
+            Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(
+                0xFFDBEAFE,
+              ),
+              borderRadius:
+              BorderRadius.circular(
+                10,
+              ),
+            ),
+            child: Text(
+              ordem.toString(),
+              style:
+              const TextStyle(
+                color: Color(
+                  0xFF2563EB,
+                ),
+                fontSize: 11,
+                fontWeight:
+                FontWeight.w900,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tipo.isEmpty
+                      ? 'Bloco'
+                      : _formatarTexto(
+                    tipo,
+                  ),
+                  style:
+                  const TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                    FontWeight.w800,
+                    color: Color(
+                      0xFF334155,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  descricao,
+                  style:
+                  const TextStyle(
+                    fontSize: 11,
+                    color: Color(
+                      0xFF64748B,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // BOTÃO INICIAR CORRIDA
+  // ==========================================================
+
+  Widget _buildBotaoIniciarCorrida(
+      BuildContext context,
+      Map<String, dynamic> corrida,
+      ) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          _abrirExecucaoCorrida(
+            context,
+            corrida,
+          );
+        },
+        icon: const Icon(
+          Icons.play_arrow_rounded,
+        ),
+        label: const Text(
+          'Iniciar corrida',
+        ),
+        style:
+        ElevatedButton.styleFrom(
+          minimumSize:
+          const Size.fromHeight(50),
+          backgroundColor:
+          const Color(
+            0xFF2563EB,
+          ),
+          foregroundColor:
+          Colors.white,
+          elevation: 0,
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================================
+  // EXECUÇÃO DA CORRIDA
+  // ==========================================================
+
+  void _abrirExecucaoCorrida(
+      BuildContext context,
+      Map<String, dynamic> corrida,
+      ) {
+    final treinoExecucao =
+    Map<String, dynamic>.from(treino);
+
+    // Mantém somente a corrida selecionada.
+    treinoExecucao['corridas'] = [
+      Map<String, dynamic>.from(corrida),
+    ];
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) {
+          return TreinoExecucaoPage(
+            treino: treinoExecucao,
+            exercicios: const [],
+            onTreinoConcluido:
+            onTreinoConcluido,
+          );
+        },
+      ),
+    );
+  }
+
+  // ==========================================================
+  // INFORMAÇÃO
+  // ==========================================================
+
+  Widget _buildInformacaoCorrida({
+    required IconData icone,
+    required String titulo,
+    required String valor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFFF8FAFC,
+        ),
+        borderRadius:
+        BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(
+            0xFFE2E8F0,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icone,
+            size: 19,
+            color: const Color(
+              0xFF2563EB,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style:
+                  const TextStyle(
+                    fontSize: 10,
+                    color: Color(
+                      0xFF94A3B8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  valor,
+                  style:
+                  const TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                    FontWeight.w700,
+                    color: Color(
+                      0xFF334155,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // OBSERVAÇÃO CORRIDA
+  // ==========================================================
+
+  Widget _buildObservacaoCorrida(
+      String observacoes,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding:
+      const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFFFFFBEB,
+        ),
+        borderRadius:
+        BorderRadius.circular(13),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: Color(
+              0xFFD97706,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              observacoes,
+              style:
+              const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: Color(
+                  0xFF92400E,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================
+  // SEM PRESCRIÇÃO
+  // ==========================================================
+
+  Widget _buildCorridaSemPrescricao() {
+    return Container(
+      padding:
+      const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+        BorderRadius.circular(18),
+      ),
+      child: const Column(
+        children: [
+          Icon(
+            Icons.directions_run_rounded,
+            size: 44,
+            color: Color(
+              0xFF94A3B8,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Nenhuma prescrição de corrida',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight:
+              FontWeight.w700,
+              color: Color(
+                0xFF475569,
+              ),
+            ),
+          ),
+          SizedBox(height: 5),
+          Text(
+            'Este treino ainda não possui uma prescrição de corrida disponível.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Color(
+                0xFF94A3B8,
+              ),
             ),
           ),
         ],
@@ -265,12 +1125,16 @@ class TreinoDetalhePage extends StatelessWidget {
       String observacoes,
       ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding:
+      const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFFE5E7EB),
+          color: const Color(
+            0xFFE5E7EB,
+          ),
         ),
       ),
       child: Row(
@@ -281,13 +1145,19 @@ class TreinoDetalhePage extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: const Color(
+                0xFFF1F5F9,
+              ),
               borderRadius:
-              BorderRadius.circular(12),
+              BorderRadius.circular(
+                12,
+              ),
             ),
             child: const Icon(
               Icons.notes_rounded,
-              color: Color(0xFF64748B),
+              color: Color(
+                0xFF64748B,
+              ),
               size: 20,
             ),
           ),
@@ -299,19 +1169,26 @@ class TreinoDetalhePage extends StatelessWidget {
               children: [
                 const Text(
                   'Orientações',
-                  style: TextStyle(
+                  style:
+                  TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF334155),
+                    fontWeight:
+                    FontWeight.w800,
+                    color: Color(
+                      0xFF334155,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   observacoes,
-                  style: const TextStyle(
+                  style:
+                  const TextStyle(
                     fontSize: 13,
                     height: 1.45,
-                    color: Color(0xFF64748B),
+                    color: Color(
+                      0xFF64748B,
+                    ),
                   ),
                 ),
               ],
@@ -336,27 +1213,39 @@ class TreinoDetalhePage extends StatelessWidget {
             'Exercícios',
             style: TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1F2937),
+              fontWeight:
+              FontWeight.w800,
+              color: Color(
+                0xFF1F2937,
+              ),
             ),
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(
+          padding:
+          const EdgeInsets.symmetric(
             horizontal: 11,
             vertical: 6,
           ),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
+            color: const Color(
+              0xFFEFF6FF,
+            ),
             borderRadius:
-            BorderRadius.circular(20),
+            BorderRadius.circular(
+              20,
+            ),
           ),
           child: Text(
             '$quantidade',
-            style: const TextStyle(
-              color: Color(0xFF2563EB),
+            style:
+            const TextStyle(
+              color: Color(
+                0xFF2563EB,
+              ),
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight:
+              FontWeight.w800,
             ),
           ),
         ),
@@ -374,10 +1263,14 @@ class TreinoDetalhePage extends StatelessWidget {
       int numero,
       ) {
     final nome =
-    treinoService.nomeExercicio(exercicio);
+    treinoService.nomeExercicio(
+      exercicio,
+    );
 
     final grupo =
-    treinoService.grupoMuscular(exercicio);
+    treinoService.grupoMuscular(
+      exercicio,
+    );
 
     final equipamento =
     treinoService.equipamentoExercicio(
@@ -385,10 +1278,14 @@ class TreinoDetalhePage extends StatelessWidget {
     );
 
     final nivel =
-    treinoService.nivelExercicio(exercicio);
+    treinoService.nivelExercicio(
+      exercicio,
+    );
 
     final series =
-    treinoService.seriesExercicio(exercicio);
+    treinoService.seriesExercicio(
+      exercicio,
+    );
 
     final repeticoes =
     treinoService.repeticoesExercicio(
@@ -396,10 +1293,14 @@ class TreinoDetalhePage extends StatelessWidget {
     );
 
     final carga =
-    treinoService.cargaExercicio(exercicio);
+    treinoService.cargaExercicio(
+      exercicio,
+    );
 
     final tempo =
-    treinoService.tempoExercicio(exercicio);
+    treinoService.tempoExercicio(
+      exercicio,
+    );
 
     final unidadeTempo =
     treinoService.unidadeTempoExercicio(
@@ -412,13 +1313,19 @@ class TreinoDetalhePage extends StatelessWidget {
     );
 
     final tipoExecucao =
-    treinoService.tipoExecucao(exercicio);
+    treinoService.tipoExecucao(
+      exercicio,
+    );
 
     final videoUrl =
-    treinoService.videoUrl(exercicio);
+    treinoService.videoUrl(
+      exercicio,
+    );
 
     final imagemUrl =
-    treinoService.imagemUrl(exercicio);
+    treinoService.imagemUrl(
+      exercicio,
+    );
 
     final observacoes =
     treinoService.observacoesExercicio(
@@ -428,10 +1335,12 @@ class TreinoDetalhePage extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(21),
+        borderRadius:
+        BorderRadius.circular(21),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
+            color:
+            Colors.black.withValues(
               alpha: 0.045,
             ),
             blurRadius: 13,
@@ -440,7 +1349,8 @@ class TreinoDetalhePage extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding:
+        const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment:
           CrossAxisAlignment.start,
@@ -458,19 +1368,26 @@ class TreinoDetalhePage extends StatelessWidget {
                     children: [
                       Text(
                         nome,
-                        style: const TextStyle(
+                        style:
+                        const TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1F2937),
+                          fontWeight:
+                          FontWeight.w800,
+                          color: Color(
+                            0xFF1F2937,
+                          ),
                         ),
                       ),
                       if (grupo.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           grupo,
-                          style: const TextStyle(
+                          style:
+                          const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: Color(
+                              0xFF64748B,
+                            ),
                           ),
                         ),
                       ],
@@ -485,45 +1402,60 @@ class TreinoDetalhePage extends StatelessWidget {
                         videoUrl,
                       );
                     },
-                    tooltip: 'Ver vídeo',
+                    tooltip:
+                    'Ver vídeo',
                     icon: const Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: Color(0xFF2563EB),
+                      Icons
+                          .play_circle_fill_rounded,
+                      color: Color(
+                        0xFF2563EB,
+                      ),
                       size: 29,
                     ),
                   ),
               ],
             ),
+
             const SizedBox(height: 16),
+
             if (imagemUrl != null)
               _buildImagem(imagemUrl),
+
             if (imagemUrl != null)
               const SizedBox(height: 14),
+
             _buildParametros(
               series: series,
               repeticoes: repeticoes,
               carga: carga,
               tempo: tempo,
-              unidadeTempo: unidadeTempo,
+              unidadeTempo:
+              unidadeTempo,
               descanso: descanso,
             ),
+
             if (equipamento.isNotEmpty ||
                 nivel.isNotEmpty ||
                 tipoExecucao.isNotEmpty) ...[
               const SizedBox(height: 14),
               _buildDetalhesSecundarios(
-                equipamento: equipamento,
+                equipamento:
+                equipamento,
                 nivel: nivel,
-                tipoExecucao: tipoExecucao,
+                tipoExecucao:
+                tipoExecucao,
               ),
             ],
+
             if (observacoes.isNotEmpty) ...[
               const SizedBox(height: 14),
               _buildObservacaoExercicio(
                 observacoes,
               ),
             ],
+
             const SizedBox(height: 16),
+
             _buildBotaoExecucao(
               context,
               exercicio,
@@ -547,15 +1479,27 @@ class TreinoDetalhePage extends StatelessWidget {
       height: 42,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFECFDF5),
-        borderRadius: BorderRadius.circular(13),
+        color: const Color(
+          0xFFECFDF5,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          13,
+        ),
       ),
       child: Text(
-        numero.toString().padLeft(2, '0'),
-        style: const TextStyle(
-          color: Color(0xFF15803D),
+        numero.toString().padLeft(
+          2,
+          '0',
+        ),
+        style:
+        const TextStyle(
+          color: Color(
+            0xFF15803D,
+          ),
           fontSize: 13,
-          fontWeight: FontWeight.w900,
+          fontWeight:
+          FontWeight.w900,
         ),
       ),
     );
@@ -569,7 +1513,8 @@ class TreinoDetalhePage extends StatelessWidget {
       String url,
       ) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius:
+      BorderRadius.circular(16),
       child: AspectRatio(
         aspectRatio: 16 / 8,
         child: Image.network(
@@ -592,12 +1537,17 @@ class TreinoDetalhePage extends StatelessWidget {
             }
 
             return Container(
-              color: const Color(0xFFF1F5F9),
-              alignment: Alignment.center,
-              child: const SizedBox(
+              color: const Color(
+                0xFFF1F5F9,
+              ),
+              alignment:
+              Alignment.center,
+              child:
+              const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(
+                child:
+                CircularProgressIndicator(
                   strokeWidth: 2,
                 ),
               ),
@@ -610,18 +1560,24 @@ class TreinoDetalhePage extends StatelessWidget {
 
   Widget _buildImagemIndisponivel() {
     return Container(
-      color: const Color(0xFFF1F5F9),
-      alignment: Alignment.center,
+      color: const Color(
+        0xFFF1F5F9,
+      ),
+      alignment:
+      Alignment.center,
       child: const Icon(
-        Icons.image_not_supported_outlined,
-        color: Color(0xFF94A3B8),
+        Icons
+            .image_not_supported_outlined,
+        color: Color(
+          0xFF94A3B8,
+        ),
         size: 34,
       ),
     );
   }
 
   // ==========================================================
-  // PARÂMETROS
+  // PARÂMETROS ACADEMIA
   // ==========================================================
 
   Widget _buildParametros({
@@ -637,9 +1593,11 @@ class TreinoDetalhePage extends StatelessWidget {
     if (series != null && series > 0) {
       itens.add(
         _ParametroItem(
-          icone: Icons.repeat_rounded,
+          icone:
+          Icons.repeat_rounded,
           titulo: 'Séries',
-          valor: series.toString(),
+          valor:
+          series.toString(),
         ),
       );
     }
@@ -648,7 +1606,8 @@ class TreinoDetalhePage extends StatelessWidget {
       itens.add(
         _ParametroItem(
           icone:
-          Icons.format_list_numbered_rounded,
+          Icons
+              .format_list_numbered_rounded,
           titulo: 'Repetições',
           valor: repeticoes,
         ),
@@ -658,7 +1617,9 @@ class TreinoDetalhePage extends StatelessWidget {
     if (carga.isNotEmpty) {
       itens.add(
         _ParametroItem(
-          icone: Icons.fitness_center_rounded,
+          icone:
+          Icons
+              .fitness_center_rounded,
           titulo: 'Carga',
           valor: carga,
         ),
@@ -668,22 +1629,29 @@ class TreinoDetalhePage extends StatelessWidget {
     if (tempo != null && tempo > 0) {
       itens.add(
         _ParametroItem(
-          icone: Icons.timer_outlined,
+          icone:
+          Icons.timer_outlined,
           titulo: 'Tempo',
-          valor: unidadeTempo.isEmpty
+          valor: unidadeTempo
+              .isEmpty
               ? tempo.toString()
               : '$tempo $unidadeTempo',
         ),
       );
     }
 
-    if (descanso != null && descanso > 0) {
+    if (descanso != null &&
+        descanso > 0) {
       itens.add(
         _ParametroItem(
           icone:
-          Icons.hourglass_bottom_rounded,
+          Icons
+              .hourglass_bottom_rounded,
           titulo: 'Descanso',
-          valor: _formatarDescanso(descanso),
+          valor:
+          _formatarDescanso(
+            descanso,
+          ),
         ),
       );
     }
@@ -702,16 +1670,23 @@ class TreinoDetalhePage extends StatelessWidget {
   Widget _buildSemParametros() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding:
+      const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(13),
+        color: const Color(
+          0xFFF8FAFC,
+        ),
+        borderRadius:
+        BorderRadius.circular(13),
       ),
       child: const Text(
         'Parâmetros do exercício não informados.',
-        style: TextStyle(
+        style:
+        TextStyle(
           fontSize: 12,
-          color: Color(0xFF64748B),
+          color: Color(
+            0xFF64748B,
+          ),
         ),
       ),
     );
@@ -724,11 +1699,14 @@ class TreinoDetalhePage extends StatelessWidget {
       return '${segundos}s';
     }
 
-    final minutos = segundos ~/ 60;
-    final resto = segundos % 60;
+    final minutos =
+        segundos ~/ 60;
+
+    final resto =
+        segundos % 60;
 
     if (resto == 0) {
-      return '${minutos}min';
+      return '$minutos min';
     }
 
     return '${minutos}min ${resto}s';
@@ -774,20 +1752,31 @@ class TreinoDetalhePage extends StatelessWidget {
               horizontal: 10,
               vertical: 7,
             ),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+            decoration:
+            BoxDecoration(
+              color: const Color(
+                0xFFF8FAFC,
+              ),
               borderRadius:
-              BorderRadius.circular(20),
+              BorderRadius.circular(
+                20,
+              ),
               border: Border.all(
-                color: const Color(0xFFE2E8F0),
+                color: const Color(
+                  0xFFE2E8F0,
+                ),
               ),
             ),
             child: Text(
               texto,
-              style: const TextStyle(
+              style:
+              const TextStyle(
                 fontSize: 11,
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.w600,
+                color: Color(
+                  0xFF475569,
+                ),
+                fontWeight:
+                FontWeight.w600,
               ),
             ),
           );
@@ -805,10 +1794,14 @@ class TreinoDetalhePage extends StatelessWidget {
       ) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding:
+      const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(13),
+        color: const Color(
+          0xFFFFFBEB,
+        ),
+        borderRadius:
+        BorderRadius.circular(13),
       ),
       child: Row(
         crossAxisAlignment:
@@ -817,16 +1810,21 @@ class TreinoDetalhePage extends StatelessWidget {
           const Icon(
             Icons.info_outline_rounded,
             size: 18,
-            color: Color(0xFFD97706),
+            color: Color(
+              0xFFD97706,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               observacoes,
-              style: const TextStyle(
+              style:
+              const TextStyle(
                 fontSize: 12,
                 height: 1.4,
-                color: Color(0xFF92400E),
+                color: Color(
+                  0xFF92400E,
+                ),
               ),
             ),
           ),
@@ -836,7 +1834,7 @@ class TreinoDetalhePage extends StatelessWidget {
   }
 
   // ==========================================================
-  // EXECUÇÃO
+  // EXECUÇÃO ACADEMIA
   // ==========================================================
 
   Widget _buildBotaoExecucao(
@@ -846,7 +1844,8 @@ class TreinoDetalhePage extends StatelessWidget {
       ) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton.icon(
+      child:
+      ElevatedButton.icon(
         onPressed: () {
           _abrirExecucao(
             context,
@@ -860,39 +1859,40 @@ class TreinoDetalhePage extends StatelessWidget {
         label: const Text(
           'Iniciar exercício',
         ),
-        style: ElevatedButton.styleFrom(
+        style:
+        ElevatedButton.styleFrom(
           minimumSize:
-          const Size.fromHeight(46),
+          const Size.fromHeight(
+            46,
+          ),
           backgroundColor:
-          const Color(0xFF16A34A),
-          foregroundColor: Colors.white,
+          const Color(
+            0xFF16A34A,
+          ),
+          foregroundColor:
+          Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+          shape:
+          RoundedRectangleBorder(
+            borderRadius:
+            BorderRadius.circular(
+              14,
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Abre a tela de execução interativa.
-  ///
-  /// A tela recebe:
-  /// - o treino completo;
-  /// - todos os exercícios;
-  /// - o índice do exercício selecionado;
-  /// - o callback de conclusão do treino.
-  ///
-  /// Dessa forma o paciente pode iniciar pelo exercício
-  /// escolhido e continuar normalmente pelos exercícios
-  /// seguintes.
   void _abrirExecucao(
       BuildContext context,
       Map<String, dynamic> exercicio,
       int numero,
       ) {
     final exercicios =
-    treinoService.obterExercicios(treino);
+    treinoService.obterExercicios(
+      treino,
+    );
 
     final indice = numero - 1;
 
@@ -906,7 +1906,8 @@ class TreinoDetalhePage extends StatelessWidget {
           return TreinoExecucaoPage(
             treino: treino,
             exercicios: exercicios,
-            exercicioInicial: indice.clamp(
+            exercicioInicial:
+            indice.clamp(
               0,
               exercicios.length - 1,
             ),
@@ -928,18 +1929,26 @@ class TreinoDetalhePage extends StatelessWidget {
       ) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) {
+      builder: (
+          dialogContext,
+          ) {
         return AlertDialog(
           title: const Text(
             'Vídeo do exercício',
           ),
-          content: SelectableText(url),
+          content:
+          SelectableText(url),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(dialogContext).pop();
+                Navigator.of(
+                  dialogContext,
+                ).pop();
               },
-              child: const Text('Fechar'),
+              child:
+              const Text(
+                'Fechar',
+              ),
             ),
           ],
         );
@@ -953,36 +1962,48 @@ class TreinoDetalhePage extends StatelessWidget {
 
   Widget _buildSemExercicios() {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding:
+      const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
       ),
       child: const Column(
         children: [
           Icon(
-            Icons.fitness_center_outlined,
+            Icons
+                .fitness_center_outlined,
             size: 42,
-            color: Color(0xFF94A3B8),
+            color: Color(
+              0xFF94A3B8,
+            ),
           ),
           SizedBox(height: 12),
           Text(
             'Nenhum exercício cadastrado',
-            style: TextStyle(
+            style:
+            TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF475569),
+              fontWeight:
+              FontWeight.w700,
+              color: Color(
+                0xFF475569,
+              ),
             ),
           ),
           SizedBox(height: 5),
           Text(
-            'Este treino ainda não possui exercícios '
-                'disponíveis.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
+            'Este treino ainda não possui exercícios disponíveis.',
+            textAlign:
+            TextAlign.center,
+            style:
+            TextStyle(
               fontSize: 13,
               height: 1.4,
-              color: Color(0xFF94A3B8),
+              color: Color(
+                0xFF94A3B8,
+              ),
             ),
           ),
         ],
@@ -991,7 +2012,7 @@ class TreinoDetalhePage extends StatelessWidget {
   }
 
   // ==========================================================
-  // TIPO DO TREINO
+  // TIPO
   // ==========================================================
 
   _TipoTreinoInfo _tipoInfo(
@@ -1001,30 +2022,45 @@ class TreinoDetalhePage extends StatelessWidget {
       case 'corrida':
         return const _TipoTreinoInfo(
           nome: 'Corrida',
-          icone: Icons.directions_run_rounded,
-          cor: Color(0xFF2563EB),
+          icone:
+          Icons
+              .directions_run_rounded,
+          cor: Color(
+            0xFF2563EB,
+          ),
         );
 
       case 'cardio':
         return const _TipoTreinoInfo(
           nome: 'Cardio',
-          icone: Icons.monitor_heart_rounded,
-          cor: Color(0xFFDC2626),
+          icone:
+          Icons
+              .monitor_heart_rounded,
+          cor: Color(
+            0xFFDC2626,
+          ),
         );
 
       case 'academia':
         return const _TipoTreinoInfo(
           nome: 'Academia',
-          icone: Icons.fitness_center_rounded,
-          cor: Color(0xFF16A34A),
+          icone:
+          Icons
+              .fitness_center_rounded,
+          cor: Color(
+            0xFF16A34A,
+          ),
         );
 
       default:
         return const _TipoTreinoInfo(
           nome: 'Treino',
           icone:
-          Icons.sports_gymnastics_rounded,
-          cor: Color(0xFF7C3AED),
+          Icons
+              .sports_gymnastics_rounded,
+          cor: Color(
+            0xFF7C3AED,
+          ),
         );
     }
   }
@@ -1037,8 +2073,11 @@ class TreinoDetalhePage extends StatelessWidget {
       String? inicio,
       String? fim,
       ) {
-    final dataInicio = _formatarData(inicio);
-    final dataFim = _formatarData(fim);
+    final dataInicio =
+    _formatarData(inicio);
+
+    final dataFim =
+    _formatarData(fim);
 
     if (dataInicio.isEmpty &&
         dataFim.isEmpty) {
@@ -1063,11 +2102,13 @@ class TreinoDetalhePage extends StatelessWidget {
   String _formatarData(
       String? data,
       ) {
-    if (data == null || data.trim().isEmpty) {
+    if (data == null ||
+        data.trim().isEmpty) {
       return '';
     }
 
-    final partes = data.split('-');
+    final partes =
+    data.split('-');
 
     if (partes.length != 3) {
       return data;
@@ -1084,6 +2125,121 @@ class TreinoDetalhePage extends StatelessWidget {
     }
 
     return '$dia/$mes/$ano';
+  }
+
+  // ==========================================================
+  // HELPERS CORRIDA
+  // ==========================================================
+
+  List<Map<String, dynamic>> _obterBlocos(
+      Map<String, dynamic> corrida,
+      ) {
+    final valor =
+    corrida['blocos'];
+
+    if (valor is! List) {
+      return [];
+    }
+
+    return valor
+        .whereType<Map>()
+        .map(
+          (item) =>
+      Map<String, dynamic>.from(
+        item,
+      ),
+    )
+        .toList();
+  }
+
+  String _texto(
+      dynamic valor,
+      ) {
+    if (valor == null) {
+      return '';
+    }
+
+    return valor.toString().trim();
+  }
+
+  int? _numero(
+      dynamic valor,
+      ) {
+    if (valor == null) {
+      return null;
+    }
+
+    if (valor is int) {
+      return valor;
+    }
+
+    if (valor is double) {
+      return valor.round();
+    }
+
+    return int.tryParse(
+      valor.toString(),
+    );
+  }
+
+  double? _numeroDouble(
+      dynamic valor,
+      ) {
+    if (valor == null) {
+      return null;
+    }
+
+    if (valor is num) {
+      return valor.toDouble();
+    }
+
+    return double.tryParse(
+      valor.toString().replaceAll(
+        ',',
+        '.',
+      ),
+    );
+  }
+
+  String _formatarNumero(
+      double valor,
+      ) {
+    if (valor == valor.roundToDouble()) {
+      return valor
+          .round()
+          .toString();
+    }
+
+    return valor
+        .toStringAsFixed(2)
+        .replaceAll(
+      RegExp(r'0+$'),
+      '',
+    )
+        .replaceAll(
+      RegExp(r'\.$'),
+      '',
+    );
+  }
+
+  String _formatarTempoMinutos(
+      int segundos,
+      ) {
+    if (segundos < 60) {
+      return '${segundos}s';
+    }
+
+    final minutos =
+        segundos ~/ 60;
+
+    final resto =
+        segundos % 60;
+
+    if (resto == 0) {
+      return '$minutos min';
+    }
+
+    return '${minutos}min ${resto}s';
   }
 
   // ==========================================================
@@ -1105,7 +2261,8 @@ class TreinoDetalhePage extends StatelessWidget {
           return parte;
         }
 
-        return parte[0].toUpperCase() +
+        return parte[0]
+            .toUpperCase() +
             parte.substring(1);
       },
     )
@@ -1130,10 +2287,11 @@ class _TipoTreinoInfo {
 }
 
 // ============================================================
-// PARÂMETRO DO EXERCÍCIO
+// PARÂMETRO ACADEMIA
 // ============================================================
 
-class _ParametroItem extends StatelessWidget {
+class _ParametroItem
+    extends StatelessWidget {
   const _ParametroItem({
     required this.icone,
     required this.titulo,
@@ -1145,29 +2303,43 @@ class _ParametroItem extends StatelessWidget {
   final String valor;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
     return Container(
-      constraints: const BoxConstraints(
+      constraints:
+      const BoxConstraints(
         minWidth: 92,
       ),
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         horizontal: 11,
         vertical: 10,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(
+          0xFFF8FAFC,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          14,
+        ),
         border: Border.all(
-          color: const Color(0xFFE2E8F0),
+          color: const Color(
+            0xFFE2E8F0,
+          ),
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize:
+        MainAxisSize.min,
         children: [
           Icon(
             icone,
             size: 17,
-            color: const Color(0xFF16A34A),
+            color: const Color(
+              0xFF16A34A,
+            ),
           ),
           const SizedBox(width: 7),
           Column(
@@ -1176,18 +2348,116 @@ class _ParametroItem extends StatelessWidget {
             children: [
               Text(
                 titulo,
-                style: const TextStyle(
+                style:
+                const TextStyle(
                   fontSize: 9,
-                  color: Color(0xFF94A3B8),
+                  color: Color(
+                    0xFF94A3B8,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 valor,
-                style: const TextStyle(
+                style:
+                const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF334155),
+                  fontWeight:
+                  FontWeight.w800,
+                  color: Color(
+                    0xFF334155,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PARÂMETRO CORRIDA
+// ============================================================
+
+class _ParametroCorrida
+    extends StatelessWidget {
+  const _ParametroCorrida({
+    required this.icone,
+    required this.titulo,
+    required this.valor,
+  });
+
+  final IconData icone;
+  final String titulo;
+  final String valor;
+
+  @override
+  Widget build(
+      BuildContext context,
+      ) {
+    return Container(
+      constraints:
+      const BoxConstraints(
+        minWidth: 105,
+      ),
+      padding:
+      const EdgeInsets.symmetric(
+        horizontal: 11,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(
+          0xFFF8FAFC,
+        ),
+        borderRadius:
+        BorderRadius.circular(
+          14,
+        ),
+        border: Border.all(
+          color: const Color(
+            0xFFE2E8F0,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize:
+        MainAxisSize.min,
+        children: [
+          Icon(
+            icone,
+            size: 18,
+            color: const Color(
+              0xFF2563EB,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Text(
+                titulo,
+                style:
+                const TextStyle(
+                  fontSize: 9,
+                  color: Color(
+                    0xFF94A3B8,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                valor,
+                style:
+                const TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                  FontWeight.w800,
+                  color: Color(
+                    0xFF334155,
+                  ),
                 ),
               ),
             ],

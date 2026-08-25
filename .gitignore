@@ -46,3 +46,7 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Backups locais do desenvolvimento
+*.bak
+treino_execucao_page_backup_integracao.txt

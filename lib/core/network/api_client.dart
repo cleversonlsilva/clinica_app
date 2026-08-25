@@ -13,12 +13,18 @@ class ApiClient {
 
   final http.Client _client;
 
-  /// Endereço da API Flask quando o aplicativo
-  /// está sendo executado no Android Emulator.
+  /// Endereço da API Flask.
   ///
-  /// O endereço aponta para o computador Windows
-  /// que está executando a API Flask.
-  static const String baseUrl = 'http://10.20.30.25:5000';
+  /// Pode ser definido durante a compilação através de:
+  ///
+  /// --dart-define=API_BASE_URL=...
+  ///
+  /// Quando nenhuma URL for informada, utiliza o servidor
+  /// WEB local da rede de desenvolvimento.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.20.30.25:5000',
+  );
 
   // ==========================================================
   // GET JSON
