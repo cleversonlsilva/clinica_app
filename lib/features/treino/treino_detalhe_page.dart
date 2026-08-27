@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import 'treino_execucao_page.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
+import 'academia/treino_academia_execucao_page.dart';
+import 'corrida/treino_corrida_execucao_page.dart';
 import 'treino_service.dart';
 
 /// Tela de detalhes de um treino.
@@ -78,9 +83,9 @@ class TreinoDetalhePage extends StatelessWidget {
           32,
         ),
         children: [
-          // ====================================================
-          // CABEÇALHO
-          // ====================================================
+// ====================================================
+// CABEÇALHO
+// ====================================================
 
           _buildCabecalho(
             context,
@@ -90,18 +95,18 @@ class TreinoDetalhePage extends StatelessWidget {
             dataFim,
           ),
 
-          // ====================================================
-          // OBSERVAÇÕES GERAIS
-          // ====================================================
+// ====================================================
+// OBSERVAÇÕES GERAIS
+// ====================================================
 
           if (observacoes.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildObservacoes(observacoes),
           ],
 
-          // ====================================================
-          // CORRIDA
-          // ====================================================
+// ====================================================
+// CORRIDA
+// ====================================================
 
           if (ehCorrida) ...[
             const SizedBox(height: 22),
@@ -110,9 +115,9 @@ class TreinoDetalhePage extends StatelessWidget {
             ),
           ]
 
-          // ====================================================
-          // ACADEMIA
-          // ====================================================
+// ====================================================
+// ACADEMIA
+// ====================================================
 
           else ...[
             const SizedBox(height: 22),
@@ -147,9 +152,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // CABEÇALHO
-  // ==========================================================
+// ==========================================================
+// CABEÇALHO
+// ==========================================================
 
   Widget _buildCabecalho(
       BuildContext context,
@@ -284,9 +289,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // CORRIDA
-  // ==========================================================
+// ==========================================================
+// CORRIDA
+// ==========================================================
 
   Widget _buildCorrida(
       BuildContext context,
@@ -365,9 +370,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // OBTER CORRIDAS
-  // ==========================================================
+// ==========================================================
+// OBTER CORRIDAS
+// ==========================================================
 
   List<Map<String, dynamic>> _obterCorridas() {
     final valor =
@@ -387,9 +392,9 @@ class TreinoDetalhePage extends StatelessWidget {
         .toList();
   }
 
-  // ==========================================================
-  // CARD DA CORRIDA
-  // ==========================================================
+// ==========================================================
+// CARD DA CORRIDA
+// ==========================================================
 
   Widget _buildCorridaCard(
       BuildContext context,
@@ -425,6 +430,24 @@ class TreinoDetalhePage extends StatelessWidget {
     final blocos =
     _obterBlocos(corrida);
 
+    // ==========================================================
+    // REGRA DA PRESCRIÇÃO
+    // ==========================================================
+    //
+    // Corrida intervalada:
+    //   utiliza blocos.
+    //
+    // Corrida por distância:
+    //   NÃO utiliza blocos.
+    //
+    // A informação principal é a distância_total.
+    //
+    final ehIntervalado =
+        modo.toLowerCase() == 'intervalado';
+
+    final mostrarBlocos =
+        ehIntervalado && blocos.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -437,7 +460,8 @@ class TreinoDetalhePage extends StatelessWidget {
               alpha: 0.045,
             ),
             blurRadius: 13,
-            offset: const Offset(0, 5),
+            offset:
+            const Offset(0, 5),
           ),
         ],
       ),
@@ -448,6 +472,7 @@ class TreinoDetalhePage extends StatelessWidget {
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
+
             // ==================================================
             // TÍTULO
             // ==================================================
@@ -506,6 +531,7 @@ class TreinoDetalhePage extends StatelessWidget {
                           ),
                         ),
                       ),
+
                       if (modo.isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
@@ -540,7 +566,8 @@ class TreinoDetalhePage extends StatelessWidget {
               distanciaTotal,
               tempoEstimado:
               tempoEstimado,
-              nivel: nivel,
+              nivel:
+              nivel,
             ),
 
             // ==================================================
@@ -552,22 +579,35 @@ class TreinoDetalhePage extends StatelessWidget {
               _buildInformacaoCorrida(
                 icone:
                 Icons.flag_rounded,
-                titulo: 'Objetivo',
-                valor: objetivo,
+                titulo:
+                'Objetivo',
+                valor:
+                objetivo,
               ),
             ],
 
             // ==================================================
             // BLOCOS
             // ==================================================
+            //
+            // SOMENTE PARA CORRIDA INTERVALADA.
+            //
+            // Corrida por distância NÃO possui blocos.
+            //
 
-            if (blocos.isNotEmpty) ...[
+            if (mostrarBlocos) ...[
               const SizedBox(height: 18),
+
               _buildTituloBlocos(
                 blocos.length,
               ),
+
               const SizedBox(height: 10),
-              ...blocos.asMap().entries.map(
+
+              ...blocos
+                  .asMap()
+                  .entries
+                  .map(
                     (entry) {
                   return Padding(
                     padding:
@@ -585,11 +625,20 @@ class TreinoDetalhePage extends StatelessWidget {
             ],
 
             // ==================================================
+            // PERCURSO PLANEJADO
+            // ==================================================
+
+            _buildMapaRotaPlanejada(
+              corrida,
+            ),
+
+            // ==================================================
             // OBSERVAÇÕES
             // ==================================================
 
             if (observacoes.isNotEmpty) ...[
               const SizedBox(height: 10),
+
               _buildObservacaoCorrida(
                 observacoes,
               ),
@@ -611,9 +660,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // PARÂMETROS DA CORRIDA
-  // ==========================================================
+// ==========================================================
+// PARÂMETROS DA CORRIDA
+// ==========================================================
 
   Widget _buildParametrosCorrida({
     required int? repeticoes,
@@ -693,9 +742,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // TÍTULO DOS BLOCOS
-  // ==========================================================
+// ==========================================================
+// TÍTULO DOS BLOCOS
+// ==========================================================
 
   Widget _buildTituloBlocos(
       int quantidade,
@@ -747,9 +796,269 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // BLOCO
-  // ==========================================================
+
+// ==========================================================
+// ROTA PLANEJADA DA CORRIDA
+// ==========================================================
+
+  Widget _buildMapaRotaPlanejada(
+      Map<String, dynamic> corrida,
+      ) {
+    final rota =
+    corrida['rota'];
+
+    if (rota is! Map) {
+      return const SizedBox.shrink();
+    }
+
+    final coordenadas =
+    rota['coordenadas'];
+
+    if (coordenadas is! List ||
+        coordenadas.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final pontos = <LatLng>[];
+
+    for (final item in coordenadas) {
+      if (item is! Map) {
+        continue;
+      }
+
+      final latitude =
+      _numeroDouble(
+        item['lat'],
+      );
+
+      final longitude =
+      _numeroDouble(
+        item['lng'],
+      );
+
+      if (latitude == null ||
+          longitude == null) {
+        continue;
+      }
+
+      pontos.add(
+        LatLng(
+          latitude,
+          longitude,
+        ),
+      );
+    }
+
+    if (pontos.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final centro =
+    _calcularCentroRota(
+      pontos,
+    );
+
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment:
+              Alignment.center,
+              decoration:
+              BoxDecoration(
+                color: const Color(
+                  0xFFEFF6FF,
+                ),
+                borderRadius:
+                BorderRadius.circular(
+                  11,
+                ),
+              ),
+              child: const Icon(
+                Icons.route_rounded,
+                size: 19,
+                color: Color(
+                  0xFF2563EB,
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            const Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Percurso planejado',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                      FontWeight.w800,
+                      color: Color(
+                        0xFF1F2937,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Percurso definido pelo professor',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(
+                        0xFF64748B,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        ClipRRect(
+          borderRadius:
+          BorderRadius.circular(18),
+          child: SizedBox(
+            height: 240,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: centro,
+                initialZoom: 14,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName:
+                  'com.nexosaude.clinica_app',
+                ),
+
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: pontos,
+                      strokeWidth: 5,
+                      color: const Color(
+                        0xFF2563EB,
+                      ),
+                    ),
+                  ],
+                ),
+
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: pontos.first,
+                      width: 34,
+                      height: 34,
+                      child: Container(
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.white,
+                          shape:
+                          BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                              Colors.black.withValues(
+                                alpha: 0.15,
+                              ),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child:
+                        const Icon(
+                          Icons
+                              .play_arrow_rounded,
+                          color: Color(
+                            0xFF16A34A,
+                          ),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+
+                    Marker(
+                      point: pontos.last,
+                      width: 34,
+                      height: 34,
+                      child: Container(
+                        decoration:
+                        BoxDecoration(
+                          color: Colors.white,
+                          shape:
+                          BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                              Colors.black.withValues(
+                                alpha: 0.15,
+                              ),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child:
+                        const Icon(
+                          Icons
+                              .flag_rounded,
+                          color: Color(
+                            0xFFDC2626,
+                          ),
+                          size: 19,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  LatLng _calcularCentroRota(
+      List<LatLng> pontos,
+      ) {
+    if (pontos.isEmpty) {
+      return const LatLng(
+        0,
+        0,
+      );
+    }
+
+    double somaLatitude = 0;
+    double somaLongitude = 0;
+
+    for (final ponto in pontos) {
+      somaLatitude += ponto.latitude;
+      somaLongitude += ponto.longitude;
+    }
+
+    return LatLng(
+      somaLatitude / pontos.length,
+      somaLongitude / pontos.length,
+    );
+  }
+
+
+// ==========================================================
+// BLOCO
+// ==========================================================
 
   Widget _buildBlocoCorrida(
       Map<String, dynamic> bloco,
@@ -868,9 +1177,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // BOTÃO INICIAR CORRIDA
-  // ==========================================================
+// ==========================================================
+// BOTÃO INICIAR CORRIDA
+// ==========================================================
 
   Widget _buildBotaoIniciarCorrida(
       BuildContext context,
@@ -914,9 +1223,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // EXECUÇÃO DA CORRIDA
-  // ==========================================================
+// ==========================================================
+// EXECUÇÃO DA CORRIDA
+// ==========================================================
 
   void _abrirExecucaoCorrida(
       BuildContext context,
@@ -933,20 +1242,18 @@ class TreinoDetalhePage extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) {
-          return TreinoExecucaoPage(
+          return TreinoCorridaExecucaoPage(
             treino: treinoExecucao,
-            exercicios: const [],
-            onTreinoConcluido:
-            onTreinoConcluido,
+            treinoService: treinoService,
           );
         },
       ),
     );
   }
 
-  // ==========================================================
-  // INFORMAÇÃO
-  // ==========================================================
+// ==========================================================
+// INFORMAÇÃO
+// ==========================================================
 
   Widget _buildInformacaoCorrida({
     required IconData icone,
@@ -1017,9 +1324,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // OBSERVAÇÃO CORRIDA
-  // ==========================================================
+// ==========================================================
+// OBSERVAÇÃO CORRIDA
+// ==========================================================
 
   Widget _buildObservacaoCorrida(
       String observacoes,
@@ -1065,9 +1372,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // SEM PRESCRIÇÃO
-  // ==========================================================
+// ==========================================================
+// SEM PRESCRIÇÃO
+// ==========================================================
 
   Widget _buildCorridaSemPrescricao() {
     return Container(
@@ -1117,9 +1424,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // OBSERVAÇÕES
-  // ==========================================================
+// ==========================================================
+// OBSERVAÇÕES
+// ==========================================================
 
   Widget _buildObservacoes(
       String observacoes,
@@ -1199,9 +1506,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // TÍTULO DOS EXERCÍCIOS
-  // ==========================================================
+// ==========================================================
+// TÍTULO DOS EXERCÍCIOS
+// ==========================================================
 
   Widget _buildTituloExercicios(
       int quantidade,
@@ -1253,9 +1560,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // CARD DO EXERCÍCIO
-  // ==========================================================
+// ==========================================================
+// CARD DO EXERCÍCIO
+// ==========================================================
 
   Widget _buildExercicioCard(
       BuildContext context,
@@ -1467,9 +1774,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // NÚMERO
-  // ==========================================================
+// ==========================================================
+// NÚMERO
+// ==========================================================
 
   Widget _buildNumero(
       int numero,
@@ -1505,9 +1812,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // IMAGEM
-  // ==========================================================
+// ==========================================================
+// IMAGEM
+// ==========================================================
 
   Widget _buildImagem(
       String url,
@@ -1576,9 +1883,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // PARÂMETROS ACADEMIA
-  // ==========================================================
+// ==========================================================
+// PARÂMETROS ACADEMIA
+// ==========================================================
 
   Widget _buildParametros({
     required int? series,
@@ -1712,9 +2019,9 @@ class TreinoDetalhePage extends StatelessWidget {
     return '${minutos}min ${resto}s';
   }
 
-  // ==========================================================
-  // DETALHES SECUNDÁRIOS
-  // ==========================================================
+// ==========================================================
+// DETALHES SECUNDÁRIOS
+// ==========================================================
 
   Widget _buildDetalhesSecundarios({
     required String equipamento,
@@ -1785,9 +2092,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // OBSERVAÇÃO DO EXERCÍCIO
-  // ==========================================================
+// ==========================================================
+// OBSERVAÇÃO DO EXERCÍCIO
+// ==========================================================
 
   Widget _buildObservacaoExercicio(
       String observacoes,
@@ -1833,9 +2140,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // EXECUÇÃO ACADEMIA
-  // ==========================================================
+// ==========================================================
+// EXECUÇÃO ACADEMIA
+// ==========================================================
 
   Widget _buildBotaoExecucao(
       BuildContext context,
@@ -1903,7 +2210,7 @@ class TreinoDetalhePage extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) {
-          return TreinoExecucaoPage(
+          return TreinoAcademiaExecucaoPage(
             treino: treino,
             exercicios: exercicios,
             exercicioInicial:
@@ -1919,46 +2226,68 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // VÍDEO
-  // ==========================================================
+// ==========================================================
+// VÍDEO
+// ==========================================================
 
-  void _mostrarVideoDisponivel(
+  Future<void> _mostrarVideoDisponivel(
       BuildContext context,
       String url,
-      ) {
-    showDialog<void>(
-      context: context,
-      builder: (
-          dialogContext,
-          ) {
-        return AlertDialog(
-          title: const Text(
-            'Vídeo do exercício',
+      ) async {
+    final uri = Uri.tryParse(url.trim());
+
+    if (uri == null ||
+        (uri.scheme != 'https' &&
+            uri.scheme != 'http')) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'O endereço do vídeo não é válido.',
           ),
-          content:
-          SelectableText(url),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop();
-              },
-              child:
-              const Text(
-                'Fechar',
-              ),
-            ),
-          ],
-        );
-      },
-    );
+        ),
+      );
+      return;
+    }
+
+    try {
+      final aberto = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (aberto || !context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível abrir o vídeo.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível abrir o vídeo.',
+          ),
+        ),
+      );
+    }
   }
 
-  // ==========================================================
-  // SEM EXERCÍCIOS
-  // ==========================================================
+// ==========================================================
+// SEM EXERCÍCIOS
+// ==========================================================
 
   Widget _buildSemExercicios() {
     return Container(
@@ -2011,9 +2340,9 @@ class TreinoDetalhePage extends StatelessWidget {
     );
   }
 
-  // ==========================================================
-  // TIPO
-  // ==========================================================
+// ==========================================================
+// TIPO
+// ==========================================================
 
   _TipoTreinoInfo _tipoInfo(
       String tipo,
@@ -2065,9 +2394,9 @@ class TreinoDetalhePage extends StatelessWidget {
     }
   }
 
-  // ==========================================================
-  // DATA
-  // ==========================================================
+// ==========================================================
+// DATA
+// ==========================================================
 
   String _formatarPeriodo(
       String? inicio,
@@ -2127,9 +2456,9 @@ class TreinoDetalhePage extends StatelessWidget {
     return '$dia/$mes/$ano';
   }
 
-  // ==========================================================
-  // HELPERS CORRIDA
-  // ==========================================================
+// ==========================================================
+// HELPERS CORRIDA
+// ==========================================================
 
   List<Map<String, dynamic>> _obterBlocos(
       Map<String, dynamic> corrida,
@@ -2242,9 +2571,9 @@ class TreinoDetalhePage extends StatelessWidget {
     return '${minutos}min ${resto}s';
   }
 
-  // ==========================================================
-  // TEXTO
-  // ==========================================================
+// ==========================================================
+// TEXTO
+// ==========================================================
 
   String _formatarTexto(
       String valor,
@@ -2467,3 +2796,4 @@ class _ParametroCorrida
     );
   }
 }
+

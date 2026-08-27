@@ -1,62 +1,37 @@
 import 'package:flutter/material.dart';
 
-import 'treino_detalhe_page.dart';
-import 'treino_service.dart';
+import '../treino_detalhe_page.dart';
+import '../treino_service.dart';
 
-/// Tela principal dos treinos do paciente.
+/// Tela de listagem dos treinos de corrida do paciente.
 ///
 /// Responsabilidades:
-///
 /// - carregar os treinos através do TreinoService;
-/// - filtrar o tipo de treino quando solicitado;
-/// - apresentar os treinos prescritos pelo profissional;
+/// - apresentar somente treinos do tipo corrida;
 /// - identificar cada treino como A, B, C, D...;
 /// - apresentar período, objetivo e quantidade de exercícios;
 /// - apresentar a quantidade de execuções no período;
 /// - encaminhar o usuário para os detalhes do treino;
 /// - atualizar os dados quando retornar da execução.
 ///
-/// A identificação A/B/C é feita pela ordem dos treinos
-/// atualmente vigentes retornados pela API.
+/// A execução da corrida é responsabilidade de:
 ///
-/// O backend continua sendo responsável por definir
-/// quais treinos estão vigentes e quantas vezes cada
-/// treino foi executado.
-///
-/// O filtro [tipoFiltro] permite utilizar esta tela
-/// especificamente para Academia ou Corrida.
-///
-/// Exemplo:
-///
-/// TreinoPage(
-///   treinoService: treinoService,
-///   tipoFiltro: 'academia',
-/// )
-class TreinoPage extends StatefulWidget {
-  const TreinoPage({
+/// corrida/treino_corrida_execucao_page.dart
+class TreinoCorridaPage extends StatefulWidget {
+  const TreinoCorridaPage({
     super.key,
     required this.treinoService,
-    this.tipoFiltro,
   });
 
   final TreinoService treinoService;
 
-  /// Tipo de treino que deve ser apresentado.
-  ///
-  /// Valores esperados:
-  ///
-  /// - academia
-  /// - corrida
-  /// - cardio
-  ///
-  /// Quando nulo, todos os tipos são apresentados.
-  final String? tipoFiltro;
-
   @override
-  State<TreinoPage> createState() => _TreinoPageState();
+  State<TreinoCorridaPage> createState() =>
+      _TreinoCorridaPageState();
 }
 
-class _TreinoPageState extends State<TreinoPage> {
+class _TreinoCorridaPageState
+    extends State<TreinoCorridaPage> {
   bool _carregando = true;
   String? _erro;
 
@@ -87,15 +62,21 @@ class _TreinoPageState extends State<TreinoPage> {
       final treinos =
       await widget.treinoService.listarTreinos();
 
-      final treinosFiltrados =
-      _filtrarTreinos(treinos);
+      final treinosCorrida = treinos.where((treino) {
+        final tipo = widget.treinoService
+            .tipoTreino(treino)
+            .trim()
+            .toLowerCase();
+
+        return tipo == 'corrida';
+      }).toList();
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _treinos = treinosFiltrados;
+        _treinos = treinosCorrida;
         _carregando = false;
       });
     } catch (e) {
@@ -115,50 +96,13 @@ class _TreinoPageState extends State<TreinoPage> {
       return erro.message;
     }
 
-    return 'Não foi possível carregar os treinos.';
-  }
-
-  // ==========================================================
-  // FILTRO
-  // ==========================================================
-
-  List<Map<String, dynamic>> _filtrarTreinos(
-      List<Map<String, dynamic>> treinos,
-      ) {
-    final filtro = widget.tipoFiltro
-        ?.trim()
-        .toLowerCase();
-
-    if (filtro == null || filtro.isEmpty) {
-      return treinos;
-    }
-
-    return treinos.where((treino) {
-      final tipo = widget.treinoService
-          .tipoTreino(treino)
-          .trim()
-          .toLowerCase();
-
-      return tipo == filtro;
-    }).toList();
+    return 'Não foi possível carregar os treinos de corrida.';
   }
 
   // ==========================================================
   // IDENTIFICAÇÃO A / B / C
   // ==========================================================
 
-  /// Retorna a letra do treino conforme sua posição
-  /// entre os treinos atualmente apresentados.
-  ///
-  /// Exemplo:
-  ///
-  /// índice 0 -> A
-  /// índice 1 -> B
-  /// índice 2 -> C
-  /// índice 3 -> D
-  ///
-  /// Isso permite apresentar visualmente o mesmo conceito
-  /// utilizado no sistema web.
   String _codigoTreino(int indice) {
     if (indice < 0) {
       return 'A';
@@ -174,6 +118,44 @@ class _TreinoPageState extends State<TreinoPage> {
   }
 
   // ==========================================================
+  // NOME DO TREINO
+  // ==========================================================
+
+  String _nomeTreino(
+      Map<String, dynamic> treino,
+      String codigo,
+      ) {
+    final nome = treino['nome']
+        ?.toString()
+        .trim();
+
+    if (nome == null || nome.isEmpty) {
+      return 'Treino $codigo';
+    }
+
+    return _capitalizarNomeTreino(nome);
+  }
+
+  String _capitalizarNomeTreino(String nome) {
+    return nome
+        .trim()
+        .split(RegExp(r'\s+'))
+        .map((palavra) {
+      if (palavra.isEmpty) {
+        return palavra;
+      }
+
+      if (palavra.length == 1) {
+        return palavra.toUpperCase();
+      }
+
+      return palavra[0].toUpperCase() +
+          palavra.substring(1);
+    })
+        .join(' ');
+  }
+
+  // ==========================================================
   // BUILD
   // ==========================================================
 
@@ -182,9 +164,9 @@ class _TreinoPageState extends State<TreinoPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text(
-          _tituloPagina(),
-          style: const TextStyle(
+        title: const Text(
+          'Treinos de corrida',
+          style: TextStyle(
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -198,23 +180,6 @@ class _TreinoPageState extends State<TreinoPage> {
         child: _buildBody(),
       ),
     );
-  }
-
-  String _tituloPagina() {
-    switch (
-    widget.tipoFiltro?.trim().toLowerCase()) {
-      case 'academia':
-        return 'Treinos de academia';
-
-      case 'corrida':
-        return 'Treinos de corrida';
-
-      case 'cardio':
-        return 'Treinos de cardio';
-
-      default:
-        return 'Meus treinos';
-    }
   }
 
   // ==========================================================
@@ -264,12 +229,17 @@ class _TreinoPageState extends State<TreinoPage> {
   // ==========================================================
 
   Widget _buildCabecalho() {
-    final titulo = _tituloCabecalho();
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: _gradienteCabecalho(),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1D4ED8),
+            Color(0xFF3B82F6),
+          ],
+        ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
@@ -291,8 +261,8 @@ class _TreinoPageState extends State<TreinoPage> {
               borderRadius:
               BorderRadius.circular(16),
             ),
-            child: Icon(
-              _iconeCabecalho(),
+            child: const Icon(
+              Icons.directions_run_rounded,
               color: Colors.white,
               size: 28,
             ),
@@ -303,9 +273,9 @@ class _TreinoPageState extends State<TreinoPage> {
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                Text(
-                  titulo,
-                  style: const TextStyle(
+                const Text(
+                  'Treinos de corrida',
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 21,
                     fontWeight: FontWeight.w800,
@@ -329,91 +299,12 @@ class _TreinoPageState extends State<TreinoPage> {
     );
   }
 
-  String _tituloCabecalho() {
-    switch (
-    widget.tipoFiltro?.trim().toLowerCase()) {
-      case 'academia':
-        return 'Treinos de academia';
-
-      case 'corrida':
-        return 'Treinos de corrida';
-
-      case 'cardio':
-        return 'Treinos de cardio';
-
-      default:
-        return 'Seus treinos';
-    }
-  }
-
   String _textoQuantidadeTreinos() {
     if (_treinos.length == 1) {
-      return '1 treino prescrito para você';
+      return '1 treino de corrida prescrito';
     }
 
-    return '${_treinos.length} treinos prescritos para você';
-  }
-
-  IconData _iconeCabecalho() {
-    switch (
-    widget.tipoFiltro?.trim().toLowerCase()) {
-      case 'corrida':
-        return Icons.directions_run_rounded;
-
-      case 'cardio':
-        return Icons.monitor_heart_rounded;
-
-      case 'academia':
-        return Icons.fitness_center_rounded;
-
-      default:
-        return Icons.fitness_center_rounded;
-    }
-  }
-
-  LinearGradient _gradienteCabecalho() {
-    switch (
-    widget.tipoFiltro?.trim().toLowerCase()) {
-      case 'corrida':
-        return const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1D4ED8),
-            Color(0xFF3B82F6),
-          ],
-        );
-
-      case 'cardio':
-        return const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFB91C1C),
-            Color(0xFFEF4444),
-          ],
-        );
-
-      case 'academia':
-        return const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF166534),
-            Color(0xFF22C55E),
-          ],
-        );
-
-      default:
-        return const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF166534),
-            Color(0xFF22C55E),
-          ],
-        );
-    }
+    return '${_treinos.length} treinos de corrida prescritos';
   }
 
   // ==========================================================
@@ -424,27 +315,20 @@ class _TreinoPageState extends State<TreinoPage> {
       Map<String, dynamic> treino,
       int indice,
       ) {
-    final tipo =
-    widget.treinoService.tipoTreino(treino);
-
     final objetivo =
     widget.treinoService.objetivoTreino(treino);
 
     final observacoes =
-    widget.treinoService
-        .observacoesTreino(treino);
+    widget.treinoService.observacoesTreino(treino);
 
     final exercicios =
-    widget.treinoService
-        .obterExercicios(treino);
+    widget.treinoService.obterExercicios(treino);
 
     final dataInicio =
-    widget.treinoService
-        .dataInicioTreino(treino);
+    widget.treinoService.dataInicioTreino(treino);
 
     final dataFim =
-    widget.treinoService
-        .dataFimTreino(treino);
+    widget.treinoService.dataFimTreino(treino);
 
     final id =
     widget.treinoService.idTreino(treino);
@@ -452,9 +336,10 @@ class _TreinoPageState extends State<TreinoPage> {
     final totalExecucoes =
     _totalExecucoes(treino);
 
-    final tipoInfo = _tipoInfo(tipo);
-
     final codigo = _codigoTreino(indice);
+
+    final nomeTreino =
+    _nomeTreino(treino, codigo);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -484,17 +369,14 @@ class _TreinoPageState extends State<TreinoPage> {
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                // ==================================================
-                // IDENTIFICAÇÃO DO TREINO
-                // ==================================================
-
                 Row(
                   children: [
                     Container(
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: tipoInfo.cor,
+                        color:
+                        const Color(0xFF2563EB),
                         borderRadius:
                         BorderRadius.circular(16),
                       ),
@@ -514,56 +396,25 @@ class _TreinoPageState extends State<TreinoPage> {
                         crossAxisAlignment:
                         CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'Treino $codigo',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight:
-                                    FontWeight.w900,
-                                    color:
-                                    Color(0xFF1F2937),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding:
-                                const EdgeInsets
-                                    .symmetric(
-                                  horizontal: 9,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: tipoInfo.cor
-                                      .withValues(
-                                    alpha: 0.10,
-                                  ),
-                                  borderRadius:
-                                  BorderRadius.circular(
-                                    20,
-                                  ),
-                                ),
-                                child: Text(
-                                  tipoInfo.nome,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight:
-                                    FontWeight.w700,
-                                    color:
-                                    tipoInfo.cor,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            nomeTreino,
+                            maxLines: 2,
+                            overflow:
+                            TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight:
+                              FontWeight.w900,
+                              color:
+                              Color(0xFF1F2937),
+                            ),
                           ),
                           if (objetivo.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               objetivo,
-                              style: const TextStyle(
+                              style:
+                              const TextStyle(
                                 fontSize: 13,
                                 color:
                                 Color(0xFF6B7280),
@@ -582,10 +433,6 @@ class _TreinoPageState extends State<TreinoPage> {
 
                 const SizedBox(height: 18),
 
-                // ==================================================
-                // INFORMAÇÕES
-                // ==================================================
-
                 _buildInformacoes(
                   exercicios: exercicios.length,
                   dataInicio: dataInicio,
@@ -593,10 +440,6 @@ class _TreinoPageState extends State<TreinoPage> {
                   totalExecucoes:
                   totalExecucoes,
                 ),
-
-                // ==================================================
-                // OBSERVAÇÕES
-                // ==================================================
 
                 if (observacoes.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -640,10 +483,6 @@ class _TreinoPageState extends State<TreinoPage> {
 
                 const SizedBox(height: 16),
 
-                // ==================================================
-                // BOTÃO
-                // ==================================================
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -655,8 +494,11 @@ class _TreinoPageState extends State<TreinoPage> {
                     ),
                     label: Text(
                       exercicios.isEmpty
-                          ? 'Ver treino $codigo'
-                          : 'Ver exercícios do treino $codigo',
+                          ? 'Ver $nomeTreino'
+                          : 'Ver exercícios de '
+                          '$nomeTreino',
+                      overflow:
+                      TextOverflow.ellipsis,
                     ),
                     style:
                     OutlinedButton.styleFrom(
@@ -667,11 +509,11 @@ class _TreinoPageState extends State<TreinoPage> {
                         borderRadius:
                         BorderRadius.circular(14),
                       ),
-                      side: BorderSide(
-                        color: tipoInfo.cor,
+                      side: const BorderSide(
+                        color: Color(0xFF2563EB),
                       ),
                       foregroundColor:
-                      tipoInfo.cor,
+                      const Color(0xFF2563EB),
                     ),
                   ),
                 ),
@@ -680,7 +522,7 @@ class _TreinoPageState extends State<TreinoPage> {
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
-                      'Treino $codigo • #$id',
+                      '$nomeTreino • #$id',
                       style: const TextStyle(
                         fontSize: 11,
                         color:
@@ -701,13 +543,6 @@ class _TreinoPageState extends State<TreinoPage> {
   // TOTAL DE EXECUÇÕES
   // ==========================================================
 
-  /// Obtém o total de execuções informado pelo backend.
-  ///
-  /// O backend retorna este valor como
-  /// `total_execucoes`.
-  ///
-  /// A conversão é defensiva para aceitar tanto
-  /// int quanto valores numéricos vindos do JSON.
   int _totalExecucoes(
       Map<String, dynamic> treino,
       ) {
@@ -726,48 +561,6 @@ class _TreinoPageState extends State<TreinoPage> {
     }
 
     return 0;
-  }
-
-  // ==========================================================
-  // TIPO
-  // ==========================================================
-
-  _TipoTreinoInfo _tipoInfo(
-      String tipo,
-      ) {
-    switch (tipo) {
-      case 'corrida':
-        return const _TipoTreinoInfo(
-          nome: 'Corrida',
-          icone:
-          Icons.directions_run_rounded,
-          cor: Color(0xFF2563EB),
-        );
-
-      case 'cardio':
-        return const _TipoTreinoInfo(
-          nome: 'Cardio',
-          icone:
-          Icons.monitor_heart_rounded,
-          cor: Color(0xFFDC2626),
-        );
-
-      case 'academia':
-        return const _TipoTreinoInfo(
-          nome: 'Academia',
-          icone:
-          Icons.fitness_center_rounded,
-          cor: Color(0xFF16A34A),
-        );
-
-      default:
-        return const _TipoTreinoInfo(
-          nome: 'Treino',
-          icone:
-          Icons.sports_gymnastics_rounded,
-          cor: Color(0xFF7C3AED),
-        );
-    }
   }
 
   // ==========================================================
@@ -814,11 +607,11 @@ class _TreinoPageState extends State<TreinoPage> {
             vertical: 12,
           ),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
+            color: const Color(0xFFEFF6FF),
             borderRadius:
             BorderRadius.circular(14),
             border: Border.all(
-              color: const Color(0xFFDCFCE7),
+              color: const Color(0xFFDBEAFE),
             ),
           ),
           child: Row(
@@ -828,7 +621,7 @@ class _TreinoPageState extends State<TreinoPage> {
                 height: 34,
                 decoration: BoxDecoration(
                   color:
-                  const Color(0xFF16A34A),
+                  const Color(0xFF2563EB),
                   borderRadius:
                   BorderRadius.circular(10),
                 ),
@@ -843,11 +636,12 @@ class _TreinoPageState extends State<TreinoPage> {
                 child: Text(
                   totalExecucoes == 1
                       ? '1 execução no período'
-                      : '$totalExecucoes execuções no período',
+                      : '$totalExecucoes '
+                      'execuções no período',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF166534),
+                    color: Color(0xFF1D4ED8),
                   ),
                 ),
               ),
@@ -856,7 +650,7 @@ class _TreinoPageState extends State<TreinoPage> {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF16A34A),
+                  color: Color(0xFF2563EB),
                 ),
               ),
             ],
@@ -900,9 +694,7 @@ class _TreinoPageState extends State<TreinoPage> {
     return '$dataInicio - $dataFim';
   }
 
-  String _formatarData(
-      String? data,
-      ) {
+  String _formatarData(String? data) {
     if (data == null ||
         data.trim().isEmpty) {
       return '';
@@ -946,22 +738,6 @@ class _TreinoPageState extends State<TreinoPage> {
       ),
     );
 
-    // ========================================================
-    // ATUALIZAÇÃO
-    // ========================================================
-    //
-    // Ao retornar da tela de detalhes/execução,
-    // buscamos novamente os treinos no backend.
-    //
-    // Isso garante que:
-    // - total_execucoes seja atualizado;
-    // - novos treinos sejam refletidos;
-    // - treinos fora do período desapareçam;
-    // - a ordem A/B/C seja recalculada.
-    //
-    // Não fazemos alteração manual no objeto local.
-    // A fonte oficial continua sendo a API.
-
     if (!mounted) {
       return;
     }
@@ -973,14 +749,6 @@ class _TreinoPageState extends State<TreinoPage> {
   // CALLBACK DE CONCLUSÃO
   // ==========================================================
 
-  /// Recebe a conclusão do treino a partir da tela
-  /// de execução.
-  ///
-  /// A própria TreinoExecucaoPage já registra a execução
-  /// através do fluxo definido para o módulo.
-  ///
-  /// Aqui apenas garantimos que, quando o fluxo retornar
-  /// para esta tela, os dados sejam buscados novamente.
   Future<void> _treinoConcluido(
       int treinoId,
       int tempoTotalSegundos,
@@ -989,10 +757,6 @@ class _TreinoPageState extends State<TreinoPage> {
       return;
     }
 
-    // O backend é a fonte oficial dos dados.
-    //
-    // Não incrementamos manualmente total_execucoes,
-    // pois isso poderia duplicar uma execução já registrada.
     await _carregar();
   }
 
@@ -1025,7 +789,8 @@ class _TreinoPageState extends State<TreinoPage> {
         ),
         const SizedBox(height: 20),
         const Text(
-          'Não foi possível carregar seus treinos',
+          'Não foi possível carregar '
+              'seus treinos de corrida',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 19,
@@ -1073,27 +838,6 @@ class _TreinoPageState extends State<TreinoPage> {
   // ==========================================================
 
   Widget _buildVazio() {
-    final filtro = widget.tipoFiltro
-        ?.trim()
-        .toLowerCase();
-
-    final bool corrida = filtro == 'corrida';
-
-    final titulo = corrida
-        ? 'Nenhuma corrida disponível'
-        : filtro == 'academia'
-        ? 'Nenhum treino de academia disponível'
-        : 'Nenhum treino disponível';
-
-    final descricao = corrida
-        ? 'Quando um profissional prescrever '
-        'um treino de corrida, ele aparecerá aqui.'
-        : filtro == 'academia'
-        ? 'Quando um profissional prescrever '
-        'um treino de academia, ele aparecerá aqui.'
-        : 'Quando um profissional prescrever '
-        'um treino, ele aparecerá aqui.';
-
     return ListView(
       physics:
       const AlwaysScrollableScrollPhysics(),
@@ -1105,38 +849,33 @@ class _TreinoPageState extends State<TreinoPage> {
             width: 82,
             height: 82,
             decoration: BoxDecoration(
-              color: corrida
-                  ? const Color(0xFFEFF6FF)
-                  : const Color(0xFFF0FDF4),
+              color: const Color(0xFFEFF6FF),
               borderRadius:
               BorderRadius.circular(24),
             ),
-            child: Icon(
-              corrida
-                  ? Icons.directions_run_rounded
-                  : Icons.fitness_center_rounded,
-              color: corrida
-                  ? const Color(0xFF2563EB)
-                  : const Color(0xFF16A34A),
+            child: const Icon(
+              Icons.directions_run_rounded,
+              color: Color(0xFF2563EB),
               size: 40,
             ),
           ),
         ),
         const SizedBox(height: 22),
-        Text(
-          titulo,
+        const Text(
+          'Nenhuma corrida disponível',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
             color: Color(0xFF1F2937),
           ),
         ),
         const SizedBox(height: 10),
-        Text(
-          descricao,
+        const Text(
+          'Quando um profissional prescrever '
+              'um treino de corrida, ele aparecerá aqui.',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 1.5,
             color: Color(0xFF6B7280),
@@ -1145,22 +884,6 @@ class _TreinoPageState extends State<TreinoPage> {
       ],
     );
   }
-}
-
-// ============================================================
-// MODELO VISUAL DO TIPO
-// ============================================================
-
-class _TipoTreinoInfo {
-  const _TipoTreinoInfo({
-    required this.nome,
-    required this.icone,
-    required this.cor,
-  });
-
-  final String nome;
-  final IconData icone;
-  final Color cor;
 }
 
 // ============================================================

@@ -1,10 +1,10 @@
 ﻿import '../core/network/api_client.dart';
 
-/// ServiÃ§o responsÃ¡vel pelas operaÃ§Ãµes relacionadas
-/// aos dados do paciente no ClÃ­nica App.
+/// Serviço responsável pelas operações relacionadas
+/// aos dados do paciente no Clínica App.
 ///
-/// Este serviÃ§o nÃ£o realiza diretamente requisiÃ§Ãµes HTTP.
-/// A comunicaÃ§Ã£o Ã© delegada ao ApiClient.
+/// Este serviço não realiza diretamente requisições HTTP.
+/// A comunicação é delegada ao ApiClient.
 class PacienteApiService {
   PacienteApiService({
     required this._apiClient,
@@ -60,7 +60,7 @@ class PacienteApiService {
     );
   }
 
-  /// Consulta os horÃ¡rios disponÃ­veis para agendamento.
+  /// Consulta os horários disponíveis para agendamento.
   ///
   /// GET /api/app/paciente/agenda/disponibilidade?data=YYYY-MM-DD
   Future<Map<String, dynamic>> obterDisponibilidade({
@@ -116,7 +116,7 @@ class PacienteApiService {
     );
   }
 
-  /// Solicita a remarcaÃ§Ã£o de uma consulta.
+  /// Solicita a remarcação de uma consulta.
   ///
   /// POST /api/app/paciente/agenda/remarcar
   Future<Map<String, dynamic>> remarcarConsulta({
@@ -185,7 +185,7 @@ class PacienteApiService {
     );
   }
 
-  /// Alias para obter o plano alimentar especÃ­fico.
+  /// Alias para obter o plano alimentar específico.
   Future<Map<String, dynamic>> obterPlanoPorId({
     required String token,
     required int planoId,
@@ -212,17 +212,17 @@ class PacienteApiService {
     );
   }
 
-  /// Carrega os detalhes de uma solicitaÃ§Ã£o de exames.
+  /// Carrega os detalhes de uma solicitação de exames.
   ///
   /// GET /api/app/paciente/exames/{solicitacao_id}
   ///
   /// Retorna:
-  /// - dados da solicitaÃ§Ã£o;
+  /// - dados da solicitação;
   /// - paciente;
   /// - profissional;
   /// - exames solicitados;
   /// - resultados anexados;
-  /// - observaÃ§Ãµes;
+  /// - observações;
   /// - validade;
   /// - status.
   Future<Map<String, dynamic>> obterDetalheExame({
@@ -236,10 +236,10 @@ class PacienteApiService {
   }
 
   // ==========================================================
-  // AVALIAÃ‡ÃƒO
+  // AVALIAÇÃO
   // ==========================================================
 
-  /// Carrega as avaliaÃ§Ãµes corporais do paciente autenticado.
+  /// Carrega as avaliações corporais do paciente autenticado.
   ///
   /// GET /api/app/paciente/avaliacao
   Future<Map<String, dynamic>> obterAvaliacao({
@@ -252,10 +252,10 @@ class PacienteApiService {
   }
 
   // ==========================================================
-  // PRESCRIÃ‡ÃƒO
+  // PRESCRIÇÃO
   // ==========================================================
 
-  /// Carrega as prescriÃ§Ãµes do paciente autenticado.
+  /// Carrega as prescrições do paciente autenticado.
   ///
   /// GET /api/app/paciente/prescricao
   Future<Map<String, dynamic>> obterPrescricao({
@@ -267,7 +267,7 @@ class PacienteApiService {
     );
   }
 
-  /// Carrega o PDF de uma prescriÃ§Ã£o ativa.
+  /// Carrega o PDF de uma prescrição ativa.
   ///
   /// GET /api/app/paciente/prescricao/:prescricao_id/pdf
   ///
@@ -310,21 +310,21 @@ class PacienteApiService {
   /// - dados do treino;
   /// - objetivo;
   /// - tipo;
-  /// - perÃ­odo;
-  /// - observaÃ§Ãµes;
-  /// - exercÃ­cios;
-  /// - ordem dos exercÃ­cios;
-  /// - sÃ©ries;
-  /// - repetiÃ§Ãµes;
+  /// - período;
+  /// - observações;
+  /// - exercícios;
+  /// - ordem dos exercícios;
+  /// - séries;
+  /// - repetições;
   /// - carga;
   /// - tempo;
   /// - descanso;
   /// - grupo muscular;
   /// - equipamento;
-  /// - vÃ­deo;
+  /// - vídeo;
   /// - imagem;
-  /// - tipo de execuÃ§Ã£o;
-  /// - total de execuÃ§Ãµes no perÃ­odo.
+  /// - tipo de execução;
+  /// - total de execuções no período.
   Future<Map<String, dynamic>> obterTreinos({
     required String token,
   }) async {
@@ -334,31 +334,63 @@ class PacienteApiService {
     );
   }
 
-  /// Registra a conclusÃ£o de um treino.
+  /// Registra a conclusão de um treino.
   ///
   /// POST /api/app/paciente/treino/:treino_id/executar
   ///
-  /// O registro deve acontecer somente quando
-  /// o paciente concluir o treino.
+  /// Para treino de academia:
+  /// - tempo pode ser informado.
   ///
-  /// O backend Ã© responsÃ¡vel por:
+  /// Para corrida:
+  /// - tempo;
+  /// - distância;
+  /// - pace;
+  /// - calorias;
+  /// - rota GPS.
+  ///
+  /// O backend é responsável por:
   /// - validar o paciente;
-  /// - validar a clÃ­nica;
-  /// - validar o perÃ­odo do treino;
-  /// - registrar a execuÃ§Ã£o;
-  /// - atualizar o total de execuÃ§Ãµes.
-  ///
-  /// O campo [tempo] Ã© opcional e representa o tempo
-  /// total de execuÃ§Ã£o em segundos.
+  /// - validar a clínica;
+  /// - validar o período do treino;
+  /// - registrar a execução;
+  /// - atualizar o total de execuções.
   Future<Map<String, dynamic>> registrarExecucaoTreino({
     required String token,
     required int treinoId,
     int? tempo,
+    double? distancia,
+    double? pace,
+    double? calorias,
+    List<Map<String, double>>? rota,
   }) async {
     final body = <String, dynamic>{};
 
+    // --------------------------------------------------------
+    // TEMPO
+    // --------------------------------------------------------
+
     if (tempo != null && tempo > 0) {
       body['tempo'] = tempo;
+    }
+
+    // --------------------------------------------------------
+    // CORRIDA
+    // --------------------------------------------------------
+
+    if (distancia != null && distancia >= 0) {
+      body['distancia'] = distancia;
+    }
+
+    if (pace != null && pace >= 0) {
+      body['pace'] = pace;
+    }
+
+    if (calorias != null && calorias >= 0) {
+      body['calorias'] = calorias;
+    }
+
+    if (rota != null) {
+      body['rota'] = rota;
     }
 
     return _apiClient.post(

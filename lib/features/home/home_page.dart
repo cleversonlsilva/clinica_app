@@ -11,7 +11,8 @@ import '../evolucao/evolucao_page.dart';
 import '../exames/exames_page.dart';
 import '../plano_alimentar/plano_alimentar_page.dart';
 import '../prescricao/prescricao_page.dart';
-import '../treino/treino_page.dart';
+import '../treino/academia/treino_academia_page.dart';
+import '../treino/corrida/treino_corrida_page.dart';
 import '../treino/treino_service.dart';
 import 'home_service.dart';
 
@@ -58,6 +59,8 @@ class _HomePageState extends State<HomePage> {
   String? _erro;
 
   Map<String, dynamic>? _dados;
+
+  bool _nomeVisivel = true;
 
   @override
   void initState() {
@@ -239,25 +242,86 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nexo APP'),
+        toolbarHeight: 92,
+        backgroundColor: const Color(0xFF3D55F5),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/nexo_saude.png',
+              width: 42,
+              height: 42,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.health_and_safety_outlined,
+                  size: 38,
+                );
+              },
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _nomeVisivel
+                    ? 'Olá, ${_primeiroNome()}'
+                    : 'Olá, ••••••',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
+          IconButton(
+            tooltip: _nomeVisivel
+                ? 'Ocultar nome'
+                : 'Visualizar nome',
+            onPressed: () {
+              setState(() {
+                _nomeVisivel = !_nomeVisivel;
+              });
+            },
+            icon: Icon(
+              _nomeVisivel
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 27,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 27,
+          ),
+          const SizedBox(width: 6),
           IconButton(
             tooltip: 'Sair',
             onPressed: _logout,
-            icon: const Icon(Icons.logout_outlined),
+            icon: const Icon(
+              Icons.logout_outlined,
+              size: 30,
+            ),
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _carregar,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
           children: [
             _buildCabecalho(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 14),
             _buildResumo(),
-            const SizedBox(height: 28),
+            const SizedBox(height: 18),
 
             // ==================================================
             // ÁREA CLÍNICA
@@ -269,10 +333,10 @@ class _HomePageState extends State<HomePage> {
               icone: Icons.medical_services_outlined,
               cor: const Color(0xFF166534),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _buildModulos(),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
 
             // ==================================================
             // ÁREA DE TREINOS
@@ -284,10 +348,10 @@ class _HomePageState extends State<HomePage> {
               icone: Icons.fitness_center_outlined,
               cor: const Color(0xFF2563EB),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _buildTreinos(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             _buildAgenda(),
             const SizedBox(height: 24),
             _buildMensagem(),
@@ -323,15 +387,8 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 16),
         ],
         Text(
-          'Olá, ${_primeiroNome()}!',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
           'Acompanhe sua saúde, seus cuidados e seus treinos.',
-          style: Theme.of(context).textTheme.bodyLarge,
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
     );
@@ -366,19 +423,19 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
             color: cor.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icone,
             color: cor,
-            size: 24,
+            size: 22,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,6 +443,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 titulo,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 21,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -417,7 +475,7 @@ class _HomePageState extends State<HomePage> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -436,10 +494,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               _nomePaciente(),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                height: 1.15,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -514,11 +574,11 @@ class _HomePageState extends State<HomePage> {
       children: [
         GridView.count(
           crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.35,
+          mainAxisExtent: 132,
           children: [
             _buildModuloCard(
               icon: Icons.restaurant_menu_outlined,
@@ -578,7 +638,7 @@ class _HomePageState extends State<HomePage> {
           cor: const Color(0xFF16A34A),
           onTap: _abrirTreinosAcademia,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         _buildTreinoAcessoCard(
           icone: Icons.directions_run_rounded,
           titulo: 'Corrida',
@@ -605,7 +665,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Ink(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -623,19 +683,19 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               Container(
-                width: 58,
-                height: 58,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
                   color: cor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(17),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: Icon(
                   icone,
                   color: cor,
-                  size: 30,
+                  size: 26,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,7 +703,8 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       titulo,
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
+                        height: 1.15,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1F2937),
                       ),
@@ -652,8 +713,8 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       descricao,
                       style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.4,
+                        fontSize: 12,
+                        height: 1.3,
                         color: Color(0xFF64748B),
                       ),
                     ),
@@ -677,9 +738,8 @@ class _HomePageState extends State<HomePage> {
   void _abrirTreinosAcademia() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TreinoPage(
+        builder: (_) => TreinoAcademiaPage(
           treinoService: _treinoService,
-          tipoFiltro: 'academia',
         ),
       ),
     );
@@ -687,25 +747,13 @@ class _HomePageState extends State<HomePage> {
 
   /// Abre exclusivamente os treinos de corrida.
   ///
-  /// A tela utilizada neste primeiro momento é a
-  /// TreinoPage filtrada para corrida.
-  ///
-  /// Posteriormente a experiência de corrida poderá
-  /// evoluir para uma tela própria com:
-  ///
-  /// - percurso;
-  /// - mapa;
-  /// - distância;
-  /// - ritmo;
-  /// - tempo;
-  /// - histórico;
-  /// - acompanhamento do treino.
+  /// A tela utilizada agora é a tela especializada
+  /// de corrida.
   void _abrirTreinosCorrida() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TreinoPage(
+        builder: (_) => TreinoCorridaPage(
           treinoService: _treinoService,
-          tipoFiltro: 'corrida',
         ),
       ),
     );
@@ -852,13 +900,13 @@ class _HomePageState extends State<HomePage> {
   }) {
     final card = Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
               icon,
-              size: 30,
+              size: 26,
               color: Theme.of(context).colorScheme.primary,
             ),
             const Spacer(),

@@ -13,7 +13,8 @@ import '../../services/paciente_api_service.dart';
 /// - validação da resposta;
 /// - normalização dos treinos;
 /// - normalização dos exercícios;
-/// - identificação do tipo de treino.
+/// - identificação do tipo de treino;
+/// - registro da execução dos treinos.
 ///
 /// Importante:
 /// Este serviço NÃO calcula carga, gasto calórico,
@@ -77,6 +78,63 @@ class TreinoService {
           (treino) => Map<String, dynamic>.from(treino),
     )
         .toList();
+  }
+
+  // ==========================================================
+  // EXECUÇÃO DO TREINO
+  // ==========================================================
+
+  /// Registra a conclusão de um treino.
+  ///
+  /// O método é utilizado tanto pelo treino de academia
+  /// quanto pelo treino de corrida.
+  ///
+  /// Para academia:
+  /// - tempo pode ser informado.
+  ///
+  /// Para corrida:
+  /// - tempo;
+  /// - distância;
+  /// - pace;
+  /// - calorias;
+  /// - rota GPS.
+  ///
+  /// A comunicação HTTP permanece encapsulada no
+  /// PacienteApiService.
+  Future<Map<String, dynamic>> registrarExecucao({
+    required int treinoId,
+    int? tempo,
+    double? distancia,
+    double? pace,
+    double? calorias,
+    List<Map<String, double>>? rota,
+  }) async {
+    final token = await _obterToken();
+
+    final resposta =
+    await _pacienteApiService.registrarExecucaoTreino(
+      token: token,
+      treinoId: treinoId,
+      tempo: tempo,
+      distancia: distancia,
+      pace: pace,
+      calorias: calorias,
+      rota: rota,
+    );
+
+    final resultado = _normalizarMapa(resposta);
+
+    if (resultado['ok'] == false) {
+      throw TreinoException(
+        _obterMensagem(
+          resultado,
+          fallback:
+          'Não foi possível registrar a execução do treino.',
+        ),
+      );
+    }
+
+    return resultado;
   }
 
   // ==========================================================
