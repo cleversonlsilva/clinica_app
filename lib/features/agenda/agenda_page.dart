@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../core/notifications/notification_service.dart';
 import 'agenda_service.dart';
+import '../teleatendimento/teleatendimento_service.dart';
+import '../teleatendimento/teleatendimento_page.dart';
 
 /// Tela principal da Agenda do paciente.
 ///
@@ -19,9 +21,11 @@ class AgendaPage extends StatefulWidget {
   const AgendaPage({
     super.key,
     required this.agendaService,
+    required this.teleatendimentoService,
   });
 
   final AgendaService agendaService;
+  final TeleatendimentoService teleatendimentoService;
 
   @override
   State<AgendaPage> createState() => _AgendaPageState();
@@ -1602,61 +1606,114 @@ class _AgendaPageState extends State<AgendaPage> {
       consulta['status'],
     );
 
+    final teleatendimento =
+    consulta['teleatendimento'] is Map
+        ? Map<String, dynamic>.from(
+      consulta['teleatendimento'],
+    )
+        : null;
+
+    final teleatendimentoId =
+    teleatendimento?['id'] is int
+        ? teleatendimento!['id'] as int
+        : int.tryParse(
+      teleatendimento?['id']?.toString() ?? '',
+    );
+
+    final teleatendimentoStatus =
+    teleatendimento?['status']?.toString();
+
+    final teleatendimentoDisponivel =
+        teleatendimentoId != null &&
+            teleatendimentoStatus != 'ENCERRADO' &&
+            teleatendimentoStatus != 'CANCELADO';
+
     return Container(
-      margin:
-      const EdgeInsets.only(
+      margin: const EdgeInsets.only(
         bottom: 12,
       ),
       decoration: BoxDecoration(
-        borderRadius:
-        BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Theme.of(context)
               .colorScheme
               .outlineVariant,
         ),
       ),
-      child: ListTile(
-        contentPadding:
-        const EdgeInsets.symmetric(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 8,
+          vertical: 12,
         ),
-        leading: CircleAvatar(
-          backgroundColor:
-          Theme.of(context)
-              .colorScheme
-              .primaryContainer,
-          child: Icon(
-            Icons.calendar_month_outlined,
-            color: Theme.of(context)
-                .colorScheme
-                .primary,
-          ),
-        ),
-        title: Text(
-          _formatarDataTexto(data),
-          style: const TextStyle(
-            fontWeight:
-            FontWeight.w600,
-          ),
-        ),
-        subtitle: Padding(
-          padding:
-          const EdgeInsets.only(
-            top: 4,
-          ),
-          child: Text(
-            [
-              hora,
-              if (tipo != '-') tipo,
-            ].join(' • '),
-          ),
-        ),
-        trailing:
-        _buildStatusChip(
-          status,
-          compacto: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor:
+                Theme.of(context)
+                    .colorScheme
+                    .primaryContainer,
+                child: Icon(
+                  Icons.calendar_month_outlined,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary,
+                ),
+              ),
+              title: Text(
+                _formatarDataTexto(data),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(
+                  top: 4,
+                ),
+                child: Text(
+                  [
+                    hora,
+                    if (tipo != '-') tipo,
+                  ].join(' • '),
+                ),
+              ),
+              trailing: _buildStatusChip(
+                status,
+                compacto: true,
+              ),
+            ),
+
+            if (teleatendimentoDisponivel) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            TeleatendimentoPage(
+                              teleatendimentoId:
+                              teleatendimentoId,
+                              teleatendimentoService:
+                              widget
+                                  .teleatendimentoService,
+                            ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.videocam_outlined,
+                  ),
+                  label: const Text(
+                    'Entrar no teleatendimento',
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1835,3 +1892,4 @@ class _AgendaPageState extends State<AgendaPage> {
     );
   }
 }
+

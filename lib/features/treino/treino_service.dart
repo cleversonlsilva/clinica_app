@@ -14,6 +14,7 @@ import '../../services/paciente_api_service.dart';
 /// - normalização dos treinos;
 /// - normalização dos exercícios;
 /// - identificação do tipo de treino;
+/// - identificação de combinações de exercícios;
 /// - registro da execução dos treinos.
 ///
 /// Importante:
@@ -53,8 +54,7 @@ class TreinoService {
       throw TreinoException(
         _obterMensagem(
           resultado,
-          fallback:
-          'Não foi possível carregar os treinos.',
+          fallback: 'Não foi possível carregar os treinos.',
         ),
       );
     }
@@ -385,11 +385,170 @@ class TreinoService {
     return valor.toString().trim();
   }
 
-  /// Retorna a ordem do exercício.
+  /// Retorna a ordem original do exercício.
   int? ordemExercicio(
       Map<String, dynamic> exercicio,
       ) {
     return _intOrNull(exercicio['ordem']);
+  }
+
+  // ==========================================================
+  // COMBINAÇÃO DE EXERCÍCIOS
+  // ==========================================================
+
+  /// Retorna o identificador do grupo combinado.
+  ///
+  /// Exemplos:
+  /// - 1
+  /// - 2
+  /// - 3
+  ///
+  /// Exercícios normais normalmente possuem valor nulo.
+  int? grupoCombinado(
+      Map<String, dynamic> exercicio,
+      ) {
+    return _intOrNull(exercicio['grupo_combinado']);
+  }
+
+  /// Retorna o tipo de combinação do exercício.
+  ///
+  /// Valores esperados:
+  /// - normal
+  /// - bi-set
+  /// - tri-set
+  /// - circuito
+  String tipoCombinacao(
+      Map<String, dynamic> exercicio,
+      ) {
+    final valor = exercicio['tipo_combinacao'];
+
+    if (valor == null) {
+      return 'normal';
+    }
+
+    final texto = valor.toString().trim().toLowerCase();
+
+    if (texto.isEmpty) {
+      return 'normal';
+    }
+
+    return texto;
+  }
+
+  /// Retorna a ordem do exercício dentro do grupo combinado.
+  ///
+  /// Exemplos:
+  /// - 1 = primeiro exercício
+  /// - 2 = segundo exercício
+  /// - 3 = terceiro exercício
+  /// - 4 = quarto exercício
+  int? ordemNoGrupo(
+      Map<String, dynamic> exercicio,
+      ) {
+    return _intOrNull(exercicio['ordem_no_grupo']);
+  }
+
+  /// Verifica se o exercício pertence a uma combinação.
+  ///
+  /// Exercícios com tipo "normal" não são considerados
+  /// combinados.
+  bool isExercicioCombinado(
+      Map<String, dynamic> exercicio,
+      ) {
+    return tipoCombinacao(exercicio) != 'normal' &&
+        grupoCombinado(exercicio) != null;
+  }
+
+  /// Retorna a letra correspondente à posição do exercício
+  /// dentro do grupo combinado.
+  ///
+  /// 1 -> A
+  /// 2 -> B
+  /// 3 -> C
+  /// 4 -> D
+  /// ...
+  String letraCombinacao(
+      Map<String, dynamic> exercicio,
+      ) {
+    final ordem = ordemNoGrupo(exercicio);
+
+    if (ordem == null || ordem <= 0) {
+      return '';
+    }
+
+    final indice = ordem - 1;
+
+    if (indice >= 0 && indice < 26) {
+      return String.fromCharCode(
+        'A'.codeUnitAt(0) + indice,
+      );
+    }
+
+    return '';
+  }
+
+  /// Retorna a identificação visual do exercício combinado.
+  ///
+  /// Exemplos:
+  /// - A1
+  /// - A2
+  /// - A3
+  ///
+  /// A letra identifica a posição dentro do grupo e
+  /// o número identifica a sequência do exercício.
+  ///
+  /// Para exercícios normais retorna uma string vazia.
+  String identificacaoCombinacao(
+      Map<String, dynamic> exercicio,
+      ) {
+    if (!isExercicioCombinado(exercicio)) {
+      return '';
+    }
+
+    final grupo = grupoCombinado(exercicio);
+    final ordem = ordemNoGrupo(exercicio);
+
+    if (grupo == null || ordem == null || ordem <= 0) {
+      return '';
+    }
+
+    final letra = letraCombinacao(exercicio);
+
+    if (letra.isEmpty) {
+      return '';
+    }
+
+    return '$letra$grupo';
+  }
+
+  /// Retorna o nome amigável do tipo de combinação.
+  ///
+  /// Exemplos:
+  /// - bi-set -> BI-SET
+  /// - tri-set -> TRI-SET
+  /// - circuito -> CIRCUITO
+  /// - normal -> NORMAL
+  String nomeTipoCombinacao(
+      Map<String, dynamic> exercicio,
+      ) {
+    switch (tipoCombinacao(exercicio)) {
+      case 'bi-set':
+      case 'biset':
+      case 'bi_set':
+        return 'BI-SET';
+
+      case 'tri-set':
+      case 'triset':
+      case 'tri_set':
+        return 'TRI-SET';
+
+      case 'circuito':
+        return 'CIRCUITO';
+
+      case 'normal':
+      default:
+        return 'NORMAL';
+    }
   }
 
   // ==========================================================

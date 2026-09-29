@@ -62,7 +62,7 @@ class _TreinoAcademiaPageState
       final treinos =
       await widget.treinoService.listarTreinos();
 
-      final treinosAcademia = treinos.where((treino) {
+      var treinosAcademia = treinos.where((treino) {
         final tipo = widget.treinoService
             .tipoTreino(treino)
             .trim()
@@ -70,6 +70,38 @@ class _TreinoAcademiaPageState
 
         return tipo == 'academia';
       }).toList();
+
+      // ========================================================
+      // ORDEM DOS TREINOS
+      // ========================================================
+      //
+      // O APP deve respeitar o código definido no sistema Web.
+      // Exemplo: A -> B -> C -> D.
+      //
+      // Não usamos mais simplesmente a ordem em que a API
+      // devolve os registros, pois isso poderia fazer um treino
+      // D aparecer como A no APP.
+      final ordenados =
+      treinosAcademia.asMap().entries.toList();
+
+      ordenados.sort((a, b) {
+        final codigoA = _codigoTreino(
+          a.value,
+          a.key,
+        );
+
+        final codigoB = _codigoTreino(
+          b.value,
+          b.key,
+        );
+
+        return _ordemCodigoTreino(codigoA)
+            .compareTo(_ordemCodigoTreino(codigoB));
+      });
+
+      treinosAcademia = ordenados
+          .map((entrada) => entrada.value)
+          .toList();
 
       if (!mounted) {
         return;
@@ -100,10 +132,36 @@ class _TreinoAcademiaPageState
   }
 
   // ==========================================================
-  // IDENTIFICAÇÃO A / B / C
+  // CÓDIGO REAL DO TREINO
   // ==========================================================
+  //
+  // O código A/B/C/D deve vir do sistema Web através da API.
+  // Não usamos mais a posição do treino na lista, pois isso
+  // fazia qualquer primeiro treino recebido pela API virar A.
+  //
+  // Exemplo:
+  // Web A -> APP A
+  // Web B -> APP B
+  // Web C -> APP C
+  // Web D -> APP D
+  //
+  // Mantemos um fallback somente para registros antigos que ainda
+  // não possuam o campo "codigo".
 
-  String _codigoTreino(int indice) {
+  String _codigoTreino(
+      Map<String, dynamic> treino,
+      int indice,
+      ) {
+    final valor = treino['codigo']
+        ?.toString()
+        .trim()
+        .toUpperCase();
+
+    if (valor != null && valor.isNotEmpty) {
+      return valor;
+    }
+
+    // Compatibilidade com registros antigos sem código.
     if (indice < 0) {
       return 'A';
     }
@@ -115,6 +173,25 @@ class _TreinoAcademiaPageState
     }
 
     return 'T${indice + 1}';
+  }
+
+  // ==========================================================
+  // ORDEM DO CÓDIGO
+  // ==========================================================
+
+  int _ordemCodigoTreino(String codigo) {
+    final valor = codigo.trim().toUpperCase();
+
+    if (valor.length == 1) {
+      final caractere = valor.codeUnitAt(0);
+
+      if (caractere >= 65 && caractere <= 90) {
+        return caractere - 65;
+      }
+    }
+
+    // Códigos fora de A-Z ficam depois dos códigos normais.
+    return 1000;
   }
 
   // ==========================================================
@@ -336,7 +413,10 @@ class _TreinoAcademiaPageState
     final totalExecucoes =
     _totalExecucoes(treino);
 
-    final codigo = _codigoTreino(indice);
+    final codigo = _codigoTreino(
+      treino,
+      indice,
+    );
 
     final nomeTreino =
     _nomeTreino(treino, codigo);

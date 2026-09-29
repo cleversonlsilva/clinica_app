@@ -131,20 +131,9 @@ class TreinoDetalhePage extends StatelessWidget {
             if (exercicios.isEmpty)
               _buildSemExercicios()
             else
-              ...exercicios.asMap().entries.map(
-                    (entry) {
-                  return Padding(
-                    padding:
-                    const EdgeInsets.only(
-                      bottom: 14,
-                    ),
-                    child: _buildExercicioCard(
-                      context,
-                      entry.value,
-                      entry.key + 1,
-                    ),
-                  );
-                },
+              ..._buildAcademiaExercicios(
+                context,
+                exercicios,
               ),
           ],
         ],
@@ -1561,14 +1550,241 @@ class TreinoDetalhePage extends StatelessWidget {
   }
 
 // ==========================================================
+  // ==========================================================
+  // EXERCÍCIOS DA ACADEMIA
+  // ==========================================================
+
+  /// Monta a lista visual dos exercícios da academia.
+  ///
+  /// Exercícios normais permanecem como cards individuais.
+  /// Exercícios combinados são agrupados por grupo_combinado e
+  /// apresentados juntos com a identificação A1, A2, A3...
+  List<Widget> _buildAcademiaExercicios(
+      BuildContext context,
+      List<Map<String, dynamic>> exercicios,
+      ) {
+    final widgets = <Widget>[];
+    final gruposAdicionados = <String>{};
+
+    for (var indice = 0; indice < exercicios.length; indice++) {
+      final exercicio = exercicios[indice];
+
+      if (!treinoService.isExercicioCombinado(exercicio)) {
+        widgets.add(
+          Padding(
+            padding:
+            const EdgeInsets.only(
+              bottom: 14,
+            ),
+            child: _buildExercicioCard(
+              context,
+              exercicio,
+              indice + 1,
+            ),
+          ),
+        );
+
+        continue;
+      }
+
+      final grupo = treinoService.grupoCombinado(
+        exercicio,
+      );
+
+      if (grupo == null) {
+        widgets.add(
+          Padding(
+            padding:
+            const EdgeInsets.only(
+              bottom: 14,
+            ),
+            child: _buildExercicioCard(
+              context,
+              exercicio,
+              indice + 1,
+            ),
+          ),
+        );
+
+        continue;
+      }
+
+      final chaveGrupo =
+          '${treinoService.tipoCombinacao(exercicio)}_$grupo';
+
+      if (gruposAdicionados.contains(chaveGrupo)) {
+        continue;
+      }
+
+      gruposAdicionados.add(chaveGrupo);
+
+      final exerciciosDoGrupo = exercicios
+          .where(
+            (item) =>
+        treinoService.isExercicioCombinado(item) &&
+            treinoService.grupoCombinado(item) == grupo &&
+            treinoService.tipoCombinacao(item) ==
+                treinoService.tipoCombinacao(exercicio),
+      )
+          .toList();
+
+      exerciciosDoGrupo.sort(
+            (a, b) {
+          final ordemA =
+              treinoService.ordemNoGrupo(a) ?? 999999;
+          final ordemB =
+              treinoService.ordemNoGrupo(b) ?? 999999;
+
+          return ordemA.compareTo(ordemB);
+        },
+      );
+
+      widgets.add(
+        Padding(
+          padding:
+          const EdgeInsets.only(
+            bottom: 14,
+          ),
+          child: _buildGrupoCombinado(
+            context,
+            exerciciosDoGrupo,
+            treinoService.nomeTipoCombinacao(
+              exercicio,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  /// Card que agrupa os exercícios de um bi-set,
+  /// tri-set ou circuito.
+  Widget _buildGrupoCombinado(
+      BuildContext context,
+      List<Map<String, dynamic>> exercicios,
+      String tipo,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        12,
+        12,
+        12,
+        4,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+        BorderRadius.circular(21),
+        boxShadow: [
+          BoxShadow(
+            color:
+            Colors.black.withValues(
+              alpha: 0.045,
+            ),
+            blurRadius: 13,
+            offset:
+            const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding:
+            const EdgeInsets.fromLTRB(
+              4,
+              2,
+              4,
+              10,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                    const Color(0xFFEFF6FF),
+                    borderRadius:
+                    BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    tipo,
+                    style:
+                    const TextStyle(
+                      color:
+                      Color(0xFF2563EB),
+                      fontSize: 12,
+                      fontWeight:
+                      FontWeight.w900,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    '${exercicios.length} exercícios',
+                    style:
+                    const TextStyle(
+                      color:
+                      Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight:
+                      FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...exercicios.asMap().entries.map(
+                (entry) {
+              final exercicio = entry.value;
+              final identificacao =
+              treinoService.identificacaoCombinacao(
+                exercicio,
+              );
+
+              return Padding(
+                padding:
+                const EdgeInsets.only(
+                  bottom: 10,
+                ),
+                child: _buildExercicioCard(
+                  context,
+                  exercicio,
+                  entry.key + 1,
+                  identificacao:
+                  identificacao.isEmpty
+                      ? null
+                      : identificacao,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
 // CARD DO EXERCÍCIO
 // ==========================================================
 
   Widget _buildExercicioCard(
       BuildContext context,
       Map<String, dynamic> exercicio,
-      int numero,
-      ) {
+      int numero, {
+        String? identificacao,
+      }) {
     final nome =
     treinoService.nomeExercicio(
       exercicio,
@@ -1666,7 +1882,10 @@ class TreinoDetalhePage extends StatelessWidget {
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
-                _buildNumero(numero),
+                _buildNumero(
+                  numero,
+                  identificacao: identificacao,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1779,32 +1998,38 @@ class TreinoDetalhePage extends StatelessWidget {
 // ==========================================================
 
   Widget _buildNumero(
-      int numero,
-      ) {
+      int numero, {
+        String? identificacao,
+      }) {
+    final texto = identificacao ??
+        numero.toString().padLeft(
+          2,
+          '0',
+        );
+
+    final combinado = identificacao != null &&
+        identificacao.trim().isNotEmpty;
+
     return Container(
       width: 42,
       height: 42,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(
-          0xFFECFDF5,
-        ),
+        color: combinado
+            ? const Color(0xFFEFF6FF)
+            : const Color(0xFFECFDF5),
         borderRadius:
         BorderRadius.circular(
           13,
         ),
       ),
       child: Text(
-        numero.toString().padLeft(
-          2,
-          '0',
-        ),
-        style:
-        const TextStyle(
-          color: Color(
-            0xFF15803D,
-          ),
-          fontSize: 13,
+        texto,
+        style: TextStyle(
+          color: combinado
+              ? const Color(0xFF2563EB)
+              : const Color(0xFF15803D),
+          fontSize: combinado ? 12 : 13,
           fontWeight:
           FontWeight.w900,
         ),
@@ -2796,4 +3021,3 @@ class _ParametroCorrida
     );
   }
 }
-

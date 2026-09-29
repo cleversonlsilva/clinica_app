@@ -191,7 +191,78 @@ class _EvolucaoPageState
       return [];
     }
 
-    return _service.valores(ultima);
+    return _service.valores(ultima)
+        .where(_deveExibirIndicador)
+        .toList();
+  }
+
+  /// Campos que representam dados cadastrais/contextuais
+  /// e não devem aparecer como indicadores de evolução.
+  ///
+  /// Eles continuam disponíveis no backend e podem ser
+  /// utilizados por outras partes da aplicação.
+  bool _deveExibirIndicador(
+      Map<String, dynamic> registro,
+      ) {
+    final codigo =
+    _service.codigoCampo(registro);
+
+    final descricao =
+    _normalizarTexto(
+      _service.descricaoCampo(registro),
+    );
+
+    const codigosIgnorados = {
+      'data_avaliacao',
+      'data_da_avaliacao',
+      'avaliador',
+      'profissional',
+      'altura',
+      'idade',
+      'sexo',
+      'nivel_atividade',
+      'nivel_de_atividade',
+      'nivel_atividade_fisica',
+      'objetivo',
+    };
+
+    if (codigosIgnorados.contains(codigo)) {
+      return false;
+    }
+
+    const descricoesIgnoradas = {
+      'data da avaliacao',
+      'avaliador',
+      'profissional',
+      'altura',
+      'idade',
+      'sexo',
+      'nivel de atividade',
+      'nivel de atividade fisica',
+      'objetivo',
+    };
+
+    return !descricoesIgnoradas.contains(
+      descricao,
+    );
+  }
+
+  String _normalizarTexto(String valor) {
+    return valor
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('à', 'a')
+        .replaceAll('ã', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ô', 'o')
+        .replaceAll('õ', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ç', 'c');
   }
 
   String _texto(dynamic valor) {

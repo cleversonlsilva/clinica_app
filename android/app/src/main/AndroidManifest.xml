@@ -3,6 +3,10 @@
     <!-- Acesso à internet necessário para comunicação com a API. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Permissões necessárias para o teleatendimento por vídeo. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Localização necessária para o rastreamento das corridas. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

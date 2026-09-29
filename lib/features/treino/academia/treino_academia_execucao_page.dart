@@ -232,6 +232,174 @@ class _TreinoAcademiaExecucaoPageState
     );
   }
 
+  // ==========================================================
+  // COMBINAÇÃO DE EXERCÍCIOS — ACADEMIA
+  // ==========================================================
+
+  int _grupoCombinado(
+      Map<String, dynamic> exercicio,
+      ) {
+    final valor = exercicio['grupo_combinado'];
+
+    if (valor is int) {
+      return valor;
+    }
+
+    if (valor is num) {
+      return valor.toInt();
+    }
+
+    return int.tryParse(
+      valor?.toString() ?? '',
+    ) ??
+        0;
+  }
+
+  String _tipoCombinacao(
+      Map<String, dynamic> exercicio,
+      ) {
+    final valor = exercicio['tipo_combinacao']
+        ?.toString()
+        .trim()
+        .toLowerCase();
+
+    if (valor == null || valor.isEmpty) {
+      return 'normal';
+    }
+
+    return valor;
+  }
+
+  int _ordemNoGrupo(
+      Map<String, dynamic> exercicio,
+      ) {
+    final valor = exercicio['ordem_no_grupo'];
+
+    if (valor is int) {
+      return valor;
+    }
+
+    if (valor is num) {
+      return valor.toInt();
+    }
+
+    return int.tryParse(
+      valor?.toString() ?? '',
+    ) ??
+        0;
+  }
+
+  bool get _ehCombinacao {
+    final grupo = _grupoCombinado(_exercicioAtual);
+    final tipo = _tipoCombinacao(_exercicioAtual);
+
+    return grupo > 0 && tipo != 'normal';
+  }
+
+  String get _nomeTipoCombinacao {
+    switch (_tipoCombinacao(_exercicioAtual)) {
+      case 'bi-set':
+        return 'BI-SET';
+      case 'tri-set':
+        return 'TRI-SET';
+      case 'circuito':
+        return 'CIRCUITO';
+      default:
+        return '';
+    }
+  }
+
+  List<int> _indicesDoGrupoAtual() {
+    if (!_ehCombinacao) {
+      return <int>[_indiceExercicio];
+    }
+
+    final grupo = _grupoCombinado(_exercicioAtual);
+    final tipo = _tipoCombinacao(_exercicioAtual);
+
+    final indices = <int>[];
+
+    for (var i = 0; i < widget.exercicios.length; i++) {
+      final exercicio = widget.exercicios[i];
+
+      if (_grupoCombinado(exercicio) == grupo &&
+          _tipoCombinacao(exercicio) == tipo) {
+        indices.add(i);
+      }
+    }
+
+    indices.sort((a, b) {
+      final ordemA = _ordemNoGrupo(
+        widget.exercicios[a],
+      );
+      final ordemB = _ordemNoGrupo(
+        widget.exercicios[b],
+      );
+
+      if (ordemA != ordemB) {
+        return ordemA.compareTo(ordemB);
+      }
+
+      return a.compareTo(b);
+    });
+
+    if (indices.isEmpty) {
+      return <int>[_indiceExercicio];
+    }
+
+    return indices;
+  }
+
+  bool get _ehUltimoExercicioDoGrupo {
+    if (!_ehCombinacao) {
+      return true;
+    }
+
+    final indices = _indicesDoGrupoAtual();
+
+    return indices.last == _indiceExercicio;
+  }
+
+  String get _identificacaoCombinacao {
+    if (!_ehCombinacao) {
+      return '';
+    }
+
+    final ordem = _ordemNoGrupo(
+      _exercicioAtual,
+    );
+
+    if (ordem <= 0) {
+      return '';
+    }
+
+    final letra = String.fromCharCode(
+      64 + ordem,
+    );
+
+    return '$letra$ordem';
+  }
+
+  void _irParaProximoExercicioDoGrupo() {
+    final indices = _indicesDoGrupoAtual();
+
+    final posicao = indices.indexOf(
+      _indiceExercicio,
+    );
+
+    if (posicao < 0 ||
+        posicao >= indices.length - 1) {
+      return;
+    }
+
+    setState(() {
+      _indiceExercicio = indices[posicao + 1];
+      _segundosRestantes = _tempoExercicio;
+      _executando = false;
+      _emDescanso = false;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -315,6 +483,18 @@ class _TreinoAcademiaExecucaoPageState
     }
 
     _finalizarExecucao();
+
+    // Em BI-SET, TRI-SET ou CIRCUITO, primeiro concluímos
+    // todos os exercícios da rodada atual. Só depois iniciamos
+    // a próxima série.
+    //
+    // Exemplo BI-SET:
+    // A1 série 1 -> A2 série 1 -> A1 série 2 -> A2 série 2
+    if (_ehCombinacao &&
+        !_ehUltimoExercicioDoGrupo) {
+      _irParaProximoExercicioDoGrupo();
+      return;
+    }
 
     if (_serieAtual < _totalSeries) {
       _mostrarConclusaoSerie();
@@ -407,6 +587,22 @@ class _TreinoAcademiaExecucaoPageState
       return;
     }
 
+    if (_ehCombinacao) {
+      final indices = _indicesDoGrupoAtual();
+
+      if (indices.isNotEmpty) {
+        setState(() {
+          _serieAtual = proximaSerie;
+          _indiceExercicio = indices.first;
+          _segundosRestantes = _tempoExercicio;
+          _executando = false;
+          _emDescanso = false;
+        });
+
+        return;
+      }
+    }
+
     setState(() {
       _serieAtual = proximaSerie;
       _segundosRestantes = _tempoExercicio;
@@ -417,8 +613,27 @@ class _TreinoAcademiaExecucaoPageState
   void _finalizarExercicio() {
     _timer?.cancel();
 
-    if (_indiceExercicio >=
-        widget.exercicios.length - 1) {
+    var proximoIndice = _indiceExercicio;
+
+    if (_ehCombinacao) {
+      final indices = _indicesDoGrupoAtual();
+
+      if (indices.isNotEmpty) {
+        final ultimoIndice = indices.last;
+
+        // Ao terminar a última série do último exercício do grupo,
+        // o grupo inteiro é tratado como um único bloco.
+        if (_indiceExercicio == ultimoIndice) {
+          proximoIndice = ultimoIndice + 1;
+        } else {
+          proximoIndice = _indiceExercicio + 1;
+        }
+      }
+    } else {
+      proximoIndice = _indiceExercicio + 1;
+    }
+
+    if (proximoIndice >= widget.exercicios.length) {
       _finalizarTreino();
       return;
     }
@@ -427,7 +642,7 @@ class _TreinoAcademiaExecucaoPageState
       _executando = false;
       _emDescanso = false;
       _serieAtual = 1;
-      _indiceExercicio++;
+      _indiceExercicio = proximoIndice;
       _segundosRestantes = _tempoExercicio;
     });
   }
@@ -734,6 +949,33 @@ class _TreinoAcademiaExecucaoPageState
               crossAxisAlignment:
               CrossAxisAlignment.start,
               children: [
+                if (_ehCombinacao) ...[
+                  Container(
+                    margin: const EdgeInsets.only(
+                      bottom: 10,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius:
+                      BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _identificacaoCombinacao.isEmpty
+                          ? _nomeTipoCombinacao
+                          : '$_identificacaoCombinacao • '
+                          '$_nomeTipoCombinacao',
+                      style: const TextStyle(
+                        color: Color(0xFF166534),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
                 Text(
                   _nomeExercicio,
                   style: const TextStyle(

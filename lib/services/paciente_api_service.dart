@@ -156,6 +156,76 @@ class PacienteApiService {
     );
   }
 
+  /// Carrega os dados de um teleatendimento do paciente autenticado.
+  ///
+  /// GET /api/app/paciente/teleatendimento/{teleatendimento_id}
+  Future<Map<String, dynamic>> obterTeleatendimento({
+    required String token,
+    required int teleatendimentoId,
+  }) async {
+    return _apiClient.get(
+      '/api/app/paciente/teleatendimento/$teleatendimentoId',
+      token: token,
+    );
+  }
+
+
+  // ==========================================================
+  // TELEATENDIMENTO - TOKEN LIVEKIT
+  // ==========================================================
+
+  Future<Map<String, dynamic>> obterTokenTeleatendimento({
+    required String token,
+    required int teleatendimentoId,
+  }) async {
+    return _apiClient.get(
+      '/api/app/paciente/teleatendimento/$teleatendimentoId/token',
+      token: token,
+    );
+  }
+
+  // ==========================================================
+  // TELEATENDIMENTO - ENTRADA DO PACIENTE
+  // ==========================================================
+
+  /// Registra a entrada do paciente no teleatendimento.
+  ///
+  /// POST /api/app/paciente/teleatendimento/{teleatendimento_id}/entrar
+  ///
+  /// O backend identifica o paciente através do token
+  /// autenticado e registra:
+  /// - PACIENTE_ENTROU;
+  /// - INICIO_ATENDIMENTO;
+  /// - alteração para EM_ANDAMENTO quando aplicável.
+  Future<Map<String, dynamic>> entrarTeleatendimento({
+    required String token,
+    required int teleatendimentoId,
+  }) async {
+    return _apiClient.post(
+      '/api/app/paciente/teleatendimento/$teleatendimentoId/entrar',
+      token: token,
+    );
+  }
+
+  // ==========================================================
+  // TELEATENDIMENTO - SAÍDA DO PACIENTE
+  // ==========================================================
+
+  /// Registra a saída do paciente do teleatendimento.
+  ///
+  /// POST /api/app/paciente/teleatendimento/{teleatendimento_id}/sair
+  ///
+  /// O backend registra o evento PACIENTE_SAIU.
+  Future<Map<String, dynamic>> sairTeleatendimento({
+    required String token,
+    required int teleatendimentoId,
+  }) async {
+    return _apiClient.post(
+      '/api/app/paciente/teleatendimento/$teleatendimentoId/sair',
+      token: token,
+    );
+  }
+
   // ==========================================================
   // PLANO ALIMENTAR
   // ==========================================================
